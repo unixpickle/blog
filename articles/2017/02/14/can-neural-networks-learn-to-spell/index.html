@@ -1,0 +1,87 @@
+<html><head></head><body><article class="post-47 post type-post status-publish format-standard hentry category-uncategorized tag-artificial-intelligence tag-deep-learning tag-linguistics tag-machine-learning tag-neural-networks" id="post-47">
+<header class="entry-header">
+<h1 class="entry-title">Can Neural Networks Learn to Spell?</h1> </header><!-- .entry-header -->
+<div class="entry-content">
+<p>English spelling is extremely difficult. It has few rules, and even they are <a href="https://github.com/unixpickle/i-before-e">frequently broken</a>. Despite all this, millions of people write in English every day. How does everyone do it? Is spelling learned by brute memorization, or does the brain do something clever?</p>
+<p>Despite what pre-school teachers might tell you, people don’t learn to spell by brute memorization. When we hear a new word—sometimes even a made up word—we can usually guess how it will be spelled. If we simply memorized the spelling of every word, guessing new spellings would be impossible. It’s much more likely that the brain of an English speaker develops a probabilistic system for spelling words. This system might have some hard-wired exceptions, but it’s less rigid than a simple lookup table.</p>
+<p>So, if the brain can learn a system for English spelling, can an artificial neural network do the same? Spoiler alert: yes it can.</p>
+<p>You might wonder what the input to such a neural network might look like. For example, could we feed the network recordings of speech and expect it to produce spellings? At this point in time, I think it would be unreasonable to expect good results from such an approach. Even modern speech recognition systems first convert speech into <a href="https://en.wikipedia.org/wiki/Phonetic_transcription">phonetic transcriptions</a> before attempting to produce predictions over entire words. So, instead of feeding my network raw sound, I decided to feed it phonetic transcriptions in <a href="https://en.wikipedia.org/wiki/International_Phonetic_Alphabet">IPA.</a> IPA is a standard way to write down speech sounds without needing large audio files. As an added bonus, it’s easy to find dictionaries with IPA transcriptions.</p>
+<p>After deciding on the input format, I had to design the network itself. Since words can vary in length, I had little choice but to use a <a href="https://en.wikipedia.org/wiki/Recurrent_neural_network">Recurrent Neural Network</a>. In fact, the architecture I chose closely resembles the one used in <a href="http://www.cs.toronto.edu/%7Egraves/icml_2006.pdf">Graves et al., 2006</a> for speech recognition. To get technical, each phoneme of the input is duplicated four times (“mmmmʌʌʌʌŋŋŋŋkkkkiiii”), two separate RNNs are run on the sequence (one backwards, one forwards), and Connectionist Temporal Classification determines the final network output (i.e. the spelling). This setup has two side effects:</p>
+<ol>
+<li>Spellings cannot be more than 4 times the length of the phonetic transcriptions.</li>
+<li>The network is encouraged to “align” phonemes with their corresponding letters.</li>
+</ol>
+<p>With our network laid out, we can talk a bit about data. A while ago I had used the <a href="http://www.speech.cs.cmu.edu/cgi-bin/cmudict">CMU pronunciation dictionary</a> for a speech synthesis project, and I repurposed that dictionary as network training data. After a bit of preprocessing, I split the dictionary up into 105,139 training samples and 11,474 testing samples (where a sample is a single word). Uncompressed, this data was a bit over 2MB. The neural network, on the other hand, was only 1.8MB. This meant that, in the very least, the network couldn’t simply store an uncompressed copy of the data.</p>
+<p>When I went to train the network, I found that it learned quite quickly. In fact, I started by training the network on a single core of a <a href="https://twitter.com/unixpickle/status/825904601882836992">10-year-old iMac</a>. A single epoch took a few hours, but the result was fairly satisfying. I ran the network on a few random words to see what it could come up with:</p>
+<table>
+<tbody>
+<tr>
+<th>Actual word</th>
+<th>Input</th>
+<th>Output</th>
+</tr>
+<tr>
+<td>invader</td>
+<td><code>InveIdəɹ</code></td>
+<td>invader</td>
+</tr>
+<tr>
+<td>twelve</td>
+<td><code>twɛlv</code></td>
+<td>twelve</td>
+</tr>
+<tr>
+<td>evaluate</td>
+<td><code>IvæljueIt</code></td>
+<td>evaluate</td>
+</tr>
+<tr>
+<td>guilty</td>
+<td><code>gIlti</code></td>
+<td>gilty</td>
+</tr>
+</tbody>
+</table>
+<p>None of these words have a one-to-one mapping between phonemes and letters. In “invader”, the letter “a” only has the <code>/eI/</code> sound because it is followed by “de”. In “twelve”, we see the general rule that words cannot end in a “v”. In “evaluate”, “e” is added to the end of the word to give the last “a” an <code>/eI/</code> sound. The last example is particularly notable because the network got it wrong. Not many words are spelled like “guilty”, so this mistake is unsurprising (the fact that “guilty” is a common word has no effect; see my note at the bottom about word frequency).</p>
+<p>The trained network had a validation success rate of about 40%, meaning that it could correctly spell 40% of the words it had never seen before. This didn’t seem impressive, but I didn’t want to judge without trying myself. I selected 19 random words from the validation set and tried to spell them based on their IPA transcriptions. It was harder than I expected. The dictionary contains a huge number of uncommon words (e.g., city names, names of plants, etc.). I was only able to spell 9 out of the 19 words (47%). This should give you an idea of what I was up against:</p>
+<table>
+<tbody>
+<tr>
+<th>Phonetics</th>
+<th>My guess</th>
+<th>Network’s guess</th>
+<th>True word</th>
+</tr>
+<tr>
+<td><code>mʌkweI</code></td>
+<td>muckway</td>
+<td>mcway</td>
+<td>mcquay</td>
+</tr>
+<tr>
+<td><code>fɹægmʌnt</code></td>
+<td>fragment</td>
+<td>fragment</td>
+<td>fragment</td>
+</tr>
+<tr>
+<td><code>ʌgwangʌ</code></td>
+<td>agwanga</td>
+<td>aguanga</td>
+<td>aguanga</td>
+</tr>
+<tr>
+<td><code>pɛtɹoʊmInəɹʌlz</code></td>
+<td>petrominerals</td>
+<td>petrominerals</td>
+<td>petrominerals</td>
+</tr>
+</tbody>
+</table>
+<p>At this point, I started wondering about overfitting. After training for one epoch, cross-validation indicated that virtually no overfitting had taken place. However, I knew that further training might cause the network to lose its ability to generalize to new words. When you think about it, though, humans probably overfit spelling ourselves. Most of us can think of times when we’ve overthought the spelling of a word and ended up misspelling it as a result. In some sense, we tend to focus on weird edge cases, leading us to overthink words with normal spellings. So, as an experiment, I set out to intentionally overfit a network on spelling.</p>
+<p>I started by training the existing 1.8MB network for more epochs. Its validation success rate stabilized at around 41%, while the training success rate inched up to 48%. Encouragingly, the validation score never got worse. Eager to force a network to memorize more English spelling, I increased the number of neurons in the network. The new network took up an alarming 7MB, but it still only achieved a 44% validation success rate and a 56% training success rate. Annoyingly, that’s still an <a href="https://en.wikipedia.org/wiki/Grading_(education)">F</a>, albeit on the world’s hardest spelling test. My conclusion was that humans aren’t the only “neural” entities that struggle with spelling tests.</p>
+<p>One final thing to note is that my experiments <strong>weighted every word equally.</strong> In reality, English words are distributed on a <a href="https://en.wikipedia.org/wiki/Zipf's_law">heavy-tailed probability distribution</a>. It is undoubtable that people are better at spelling common words than extremely infrequent ones. In fact, one can sometimes get by with <a href="https://blog.xkcd.com/2015/09/22/a-thing-explainer-word-checker/">only 1000 words</a>. The takeaway is that, while a 50% success rate might not sound impressive, it could be more than enough.</p>
+<p>The code for this project is <a href="https://github.com/unixpickle/neuralspell">available on Github</a>. You might note from the commit history that this is not a new project. I had started implementing this idea months ago, but I had limited training hardware at the time. I only decided to pick the project back up once I was <a href="https://twitter.com/unixpickle/status/818996726283599872">less restricted by hardware</a>.</p>
+</div><!-- .entry-content -->
+<!-- .entry-footer -->
+</article></body></html>

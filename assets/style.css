@@ -1,0 +1,239 @@
+/* General Styles */
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f0f0f0;
+    padding: 0;
+    margin: 0;
+}
+
+article {
+    max-width: 700px;
+    margin: 80px auto;
+    padding: 20px 40px 40px 40px;
+    box-sizing: border-box;
+    background-color: white;
+}
+
+@media (max-width: 740px) {
+    article {
+        margin: 60px 20px;
+    }
+}
+
+@media (max-width: 500px) {
+    article {
+        margin: 40px 0px;
+    }
+}
+
+/* Navigation */
+
+nav.navbar {
+    width: 100%;
+    height: 40px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: white;
+    text-align: center;
+}
+
+nav.navbar a {
+    text-decoration: none;
+    cursor: pointer;
+}
+
+nav.navbar a * {
+    cursor: pointer;
+}
+
+.navbar-logo {
+    margin-top: 5px;
+    width: 30px;
+    height: 30px;
+}
+
+.navbar-title {
+    display: inline-block;
+    vertical-align: top;
+    color: #333;
+    line-height: 40px;
+}
+
+ul.article-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+ul.article-list li {
+    border-bottom: 1px solid #e0e0e0;
+    padding: 0.5em 0;
+}
+
+ul.article-list li a {
+    text-decoration: none;
+    color: inherit;
+}
+
+ul.article-list li a:hover {
+    color: #888;
+}
+
+ul.article-list .article-date {
+    color: #999;
+    cursor: pointer;
+    font-size: 0.8em;
+    vertical-align: middle;
+}
+
+ul.article-list li a:hover .article-date {
+    color: #bbb;
+}
+
+/* Headings */
+h1,
+h2 {
+    font-weight: bold;
+    color: #222;
+    margin-bottom: 0.5em;
+    line-height: 1.3em;
+}
+
+h1 {
+    font-size: 2em;
+    margin-top: 0.5em;
+    margin-bottom: 0.2em;
+    padding-bottom: 0;
+}
+
+h2 {
+    font-size: 1.5em;
+    margin-top: 1.2em;
+}
+
+.article-date {
+    margin-top: 0;
+    margin-bottom: 1em;
+    font-size: 0.8em;
+    color: #888;
+}
+
+/* Paragraphs */
+p {
+    margin-bottom: 1em;
+}
+
+p.has-text-align-center {
+    text-align: center;
+}
+
+/* Figures and Captions */
+figure {
+    margin: 1.0em auto;
+    text-align: center;
+    max-width: 100%;
+}
+
+figcaption {
+    font-size: 0.9em;
+    color: #666;
+    margin: 0.1em auto 0 auto;
+}
+
+img {
+    height: auto;
+}
+
+figure img {
+    height: auto;
+    max-width: 100%;
+}
+
+/* Gallery Styling */
+.wp-block-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 1.5em 0;
+}
+
+.wp-block-gallery .wp-block-image {
+    flex: 1 1 calc(33.333% - 10px);
+    /* Adjusts to fit three images per row */
+    box-sizing: border-box;
+}
+
+.wp-block-gallery .wp-block-image img {
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+}
+
+.wp-block-gallery .blocks-gallery-caption {
+    flex-basis: 100%;
+}
+
+/* Tables */
+.wp-block-table table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0 0 1.6em;
+    table-layout: fixed;
+}
+
+.wp-block-table table,
+th,
+td {
+    border: 1px solid black;
+    border-collapse: collapse;
+    text-align: center;
+    padding: 0.5em;
+}
+
+.wp-block-table table img {
+    max-width: 100%;
+}
+
+/* Code Blocks */
+code {
+    font-family: monospace;
+    background-color: #f5f5f5;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    color: #c7254e;
+}
+
+pre {
+    font-family: monospace;
+    background-color: #f5f5f5;
+    padding: 1em;
+    border-radius: 5px;
+    overflow-x: auto;
+    color: #333;
+}
+
+/* Quotes */
+
+blockquote {
+    box-sizing: border-box;
+    border-left: 4px solid #ccc;
+    margin-left: -14px;
+    padding-left: 10px;
+    color: #666;
+    font-style: italic;
+}
+
+/* Links */
+
+a {
+    color: #333;
+    text-decoration: underline;
+}
+
+a:hover {
+    color: #888;
+    text-decoration: none;
+}

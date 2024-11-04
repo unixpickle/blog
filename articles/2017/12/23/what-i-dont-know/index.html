@@ -1,0 +1,121 @@
+<html><head></head><body><article class="post-149 post type-post status-publish format-standard hentry category-uncategorized" id="post-149">
+<header class="entry-header">
+<h1 class="entry-title">What I Don’t Know</h1> </header><!-- .entry-header -->
+<div class="entry-content">
+<p>Starting this holiday season, I want to take some time every day to focus on a broader set of topics than just machine learning. While ML is extremely valuable, working on it day after day has given me tunnel vision. I think it’s important to remind myself that there’s more out there in the world of technology.</p>
+<p>This post is going to be an aspirational one. I started by listing a ton of things I’m embarrassed to know nothing about. Then, in the spirit of self-improvement, I came up with a list of project ideas for each topic. I find that I learn best by <em>doing</em>, so I hope these projects will help me master areas where I have little or no prior experience. And who knows, maybe others will benefit from this list as well!</p>
+<h3>Networking</h3>
+<p>My knowledge of networking is severely lacking. First of all, I have no idea how the OS network stack works on either Linux or macOS. Also, I’ve never configured a complex network (e.g. for a datacenter), so I have a limited understanding of how routing works.</p>
+<p>I am so ignorant when it comes to networking that I often struggle to formulate questions about it. Hopefully, my questions and project ideas actually make sense and turn out to be feasible.</p>
+<p><strong>Questions:</strong></p>
+<ul>
+<li>What APIs does your OS provide to intercept or manipulate network traffic?</li>
+<li>What actually happens when you connect to a WiFi network?</li>
+<li>What is a network interface? How is traffic routed through network interfaces?</li>
+<li>How do VPNs work internally (both on the server and on the client)?</li>
+<li>How flexible are Linux networking primitives?</li>
+<li>How does <code>iptables</code> work on Linux? What’s it actually do?</li>
+<li>How do NATs deal with different kinds of traffic (e.g. ICMP)?</li>
+<li>How does DNS work? How do DNS records propagate? How do custom nameservers (e.g. with NS records) work? How does something like <a href="https://github.com/yarrick/iodine">iodine</a> work?</li>
+</ul>
+<p><strong>Projects:</strong></p>
+<ul>
+<li>Re-implement something like <a href="https://www.obdev.at/products/littlesnitch/index.html">Little Snitch</a>.</li>
+<li>Try using the <a href="https://en.wikipedia.org/wiki/Berkeley_Packet_Filter">Berkeley Packet Filter</a> (or some other API) to make a live bandwidth monitor.</li>
+<li>Implement a packet-level WiFi client that gets all the way up to being able to make DNS queries. I started this with <a href="https://github.com/unixpickle/gofi">gofi</a> and <a href="https://github.com/unixpickle/wifistack">wifistack</a>, but never finished.</li>
+<li>Implement a program that exposes a fake LAN with a fake web server on some fake IP address. This will involve writing your own network stack.</li>
+<li>Implement a user-space NAT that exposes a fake “gateway” through a tunnel interface.</li>
+<li>Re-implement <a href="https://github.com/yarrick/iodine">iodine</a> in a way that parallelizes packet transmission to be faster on satellite internet connections (like on an airplane).</li>
+<li>Re-implement something like <code>ifconfig</code> using system calls.</li>
+<li>Connect your computer to both Ethernet and WiFi, and try to write a program that parallelizes an HTTP download over both interfaces simultaneously.</li>
+<li>Write a script to DOS a VPN server by allocating a ton of IP addresses.</li>
+<li>Write a simple VPN-like protocol and make a server/client for it.</li>
+<li>Try to set something up where you can create a new Docker container and assign it its own IP address from a VPN.</li>
+<li>Try to implement a simple firewall program that hooks into the same level of the network stack as <code>iptables</code>.</li>
+<li>Implement a fake DNS server and setup your router to use it. The DNS server could forward most requests to a real DNS server, but provide fake addresses for specific domains of your choosing. This would be fun for silly pranks, or for logging domains people visit.</li>
+<li>Try to bypass WiFi paywalls at hotels, airports, etc.</li>
+</ul>
+<h3>Cryptocurrency</h3>
+<p>Cryptocurrencies are extremely popular right now. So, as a tech nerd, I feel kind of lame knowing nothing about them. Maybe I should fix that!</p>
+<p><strong>Questions:</strong></p>
+<ul>
+<li>How do cryptocurrencies actually <em>work</em>?</li>
+<li>What kinds of network protocols do cryptocurrencies use?</li>
+<li>What does it mean that Ethereum is a distributed virtual machine?</li>
+<li>What computations are actually involved in mining cryptocurrencies?</li>
+</ul>
+<p><strong>Projects:</strong></p>
+<ul>
+<li>Implement a toy cryptocurrency.</li>
+<li>Write a script that, without using high-level APIs, transfers some cryptocurrency (e.g. Bitcoin) from one wallet to another.</li>
+<li>Write a small program (e.g. “Hello World”) that runs on the Ethereum VM. I honestly don’t even know if this is possible.</li>
+<li>Try writing a Bitcoin mining program from scratch.</li>
+</ul>
+<h3>Source Control</h3>
+<p>Before OpenAI, I worked mostly on solitary projects. As a result, I only used a small subset of the features offered by source control tools like Git. I never had to deal with complex merge conflicts, rebases, etc.</p>
+<p><strong>Questions:</strong></p>
+<ul>
+<li>What are some complicated use-cases for <code>git rebase</code>?</li>
+<li>How do code reviews typically work on large open source projects?</li>
+<li>What protocol does git use for remotes? Is a Github repository just a <code>.git</code> directory on a server, or is there more to it than that?</li>
+<li>What are some common/useful git commands besides <code>git push</code>, <code>git pull</code>, <code>git add</code>, <code>git commit</code>, <code>git merge</code>, <code>git remote</code>, <code>git checkout</code>, <code>git branch,</code> and <code>git rebase</code>? Also, what are some unusual/useful flags for the aforementioned commands?</li>
+<li>How do you actually set up an editor to work with <code>git add -p</code>?</li>
+<li>How does git store data internally?</li>
+</ul>
+<p><strong>Projects:</strong></p>
+<ul>
+<li>Try to write a script that uses sockets/HTTPS/SSH to push code to a Github repo. Don’t use any local git commands or APIs.</li>
+<li>On your own repos, intentionally get yourself into source control messes that you have to figure your way out of.</li>
+<li>Submit more pull requests to big open source projects.</li>
+<li>Read a ton of <code>git</code> man pages.</li>
+<li>Write a program from scratch that converts tarballs to .git directories. The .git directory would represent a repository with a single commit that adds all the files from the tarball.</li>
+</ul>
+<h3>Machine Learning</h3>
+<p>Even though I work in ML, I sometimes forget to keep tabs on the field as a whole. Here’s some stuff that I feel I should brush up on:</p>
+<p><strong>Questions:</strong></p>
+<ul>
+<li>How do SOTA object detection systems work?</li>
+<li>How do OCR systems deal with variable-length strings in images?</li>
+<li>How do neural style transfer and CycleGAN actually work?</li>
+</ul>
+<p><strong>Projects:</strong></p>
+<ul>
+<li>Make a program that puts boxes around people’s noses in movies.</li>
+<li>Make a captcha cracker.</li>
+<li>Make a screenshot-to-text system (easy to generate training data!).</li>
+<li>Try to make something that takes MNIST digits and makes them look like SVHN digits.</li>
+</ul>
+<h3>Phones</h3>
+<p>For something so ubiquitous, phones are still a mystery to me. I’m not sure how easy it is to learn about phones as a user hacking away in his apartment, but I can always try!</p>
+<p><strong>Questions:</strong></p>
+<ul>
+<li>What does the SMS protocol actually look like? How is the data transmitted? Why do different carriers seem to have different character limits?</li>
+<li>How does modern telephony work? How are calls routed?</li>
+<li>Why is it so easy to spoof a phone number, and how does one do it?</li>
+<li>How are Android apps packaged, and how easy is it to reverse engineer them?</li>
+</ul>
+<p><strong>Projects:</strong></p>
+<ul>
+<li>Try reverse engineering SMS apps on your phone. Figure out what APIs deal with SMS messages, and how messages get from the UI all the way to the cellular antenna. Try to encode and send an SMS message from as low a level as possible.</li>
+<li>Get a job at Verizon/AT&amp;T/Sprint/T-Mobile. This is probably not worth it, but telephony is one of those topics that seem pretty hard to learn about from the outside.</li>
+</ul>
+<h3>Misc. Tools</h3>
+<p>I don’t take full advantage of many of the applications I use. I could probably get a decent productivity boost by simply learning more about these tools.</p>
+<p><strong>Questions:</strong></p>
+<ul>
+<li>How do you use ViM macros?</li>
+<li>What useful keyboard shortcuts does Atom provide?</li>
+<li>How do custom <code>go get</code> URLs work?</li>
+<li>How are man pages formatted, and how can I write a good man page?</li>
+</ul>
+<p><strong>Projects:</strong></p>
+<ul>
+<li>Use a ViM macro to un-indent a chunk of lines by one space.</li>
+<li>For a day, don’t let yourself use the mouse at all in your text editor. Lookup keyboard shortcuts all you want.</li>
+<li>For a day, use your editor for all development (including running your code). Feasible with e.g. <a href="https://atom.io/packages/hydrogen">Hydrogen</a>.</li>
+<li>Make a <code>go get</code> service that allows for semantic versioning wildcards (e.g. <code>go get myservice.org/github.com/unixpickle/somelib/0.1.x</code>).</li>
+<li>Write man pages for some existing open source projects. I bet everybody will thank you.</li>
+</ul>
+</div><!-- .entry-content -->
+<!-- .entry-footer -->
+</article></body></html>

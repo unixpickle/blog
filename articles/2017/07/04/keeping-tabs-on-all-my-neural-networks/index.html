@@ -1,0 +1,77 @@
+<html><head></head><body><article class="post-122 post type-post status-publish format-standard hentry category-uncategorized" id="post-122">
+<header class="entry-header">
+<h1 class="entry-title">Keeping Tabs On All My Neural Networks</h1> </header><!-- .entry-header -->
+<div class="entry-content">
+<p>When I’m out in public, I look at my watch a lot. It’s not because I’m nervous, or because I’m obsessed with the time. It’s because I’m checking on my neural networks.</p>
+<p>At any given moment, I probably have four different machines crunching through ML tasks (e.g. training neural networks or downloading data). To keep tabs on all these machines, I use my own logging system called <a href="https://github.com/unixpickle/statushub">StatusHub</a>. With StatusHub, I can use my phone, my watch, my tablet, or my laptop to see logs from every job across all of my machines. On my watch, I see a scrollable list that looks like this:</p>
+<p><img alt="" class="aligncenter size-medium wp-image-130" height="300" sizes="(max-width: 242px) 100vw, 242px" src="img/1-1-1-1-1-1-1-IMG-20170703-180018323-1-242x300.jpg" width="242"/></p>
+<p>On my phone or laptop, I can see the same log through a web UI:</p>
+<p><img alt="" class="aligncenter wp-image-125 size-large" height="403" loading="lazy" sizes="(max-width: 660px) 100vw, 660px" src="img/1-1-1-1-1-1-1-Screen-Shot-2017-07-03-at-6.04.29-PM-1024x625.png" width="660"/></p>
+<p>I can even view the log through the command-line, but I won’t bore you with a picture of that one.</p>
+<h3>Pushing log messages</h3>
+<p>You push log messages to a StatusHub server with the <code>sh-log</code> command. Without <code>sh-log</code>, I might train a neural network like so:</p>
+<pre>$ go run *.go
+2017/07/03 18:32:57 done 4002029568 updates: cost=0.108497
+2017/07/03 18:32:58 done 4002168832 updates: cost=0.114127
+2017/07/03 18:32:59 done 4002308096 updates: cost=0.109726
+...</pre>
+<p>As you can see, the program already produces log messages, but annoyingly they only go to standard error. To push the messages to StatusHub, we can simply use <code>sh-log</code>:</p>
+<pre>$ sh-log TrainEmbedding go run *.go
+2017/07/03 18:32:57 done 4002029568 updates: cost=0.108497
+2017/07/03 18:32:58 done 4002168832 updates: cost=0.114127
+2017/07/03 18:32:59 done 4002308096 updates: cost=0.109726
+...
+</pre>
+<p>In the above example, <code>sh-log</code> executes <code>go run *.go</code> and echoes the standard output/error to a StatusHub server (which is configured via environment variables). The first argument to <code>sh-log</code> is the <em>service name</em>, which helps to distinguish between different jobs in the log. If you look back at the screenshots from the beginning of this post, the service names should stand out right away.</p>
+<p>The <code>sh-log</code> command also plays nicely with UNIX pipes. If you don’t provide a command for <code>sh-log</code> to run, it reads directly from standard input. For example, this is how I log information about my GPU:</p>
+<pre>$ nvidia-smi | head -n 9 | tail -n 1 | cut -b 3-77 | sed -e 's/\s\s*/ /g' | sh-log GPU
+23% 35C P8 10W / 250W | 63MiB / 12186MiB | 0% Default</pre>
+<h3>Viewing logs</h3>
+<p>The simplest way to view a log is via the StatusHub web UI or through the Android Wear application. However, StatusHub also ships with some commands for reading and manipulating logs.</p>
+<p>To dump the log for a given service, there is the <code>sh-dump</code> command:</p>
+<pre>$ sh-dump tweetdump
+...
+-rw-r--r--  1 alex  staff  12141949085 Jul  3 19:09 tweets.csv
+-rw-r--r--  1 alex  staff  12142001648 Jul  3 19:09 tweets.csv
+-rw-r--r--  1 alex  staff  12142061169 Jul  3 19:10 tweets.csv
+-rw-r--r--  1 alex  staff  12142116283 Jul  3 19:10 tweets.csv
+</pre>
+<p>You can also use the <code>sh-stream</code> command to view the output of a service in real time, for example:</p>
+<pre>$ sh-stream tweetdump
+-rw-r--r--  1 alex  staff  12141949085 Jul  3 19:09 tweets.csv
+-rw-r--r--  1 alex  staff  12142001648 Jul  3 19:09 tweets.csv
+-rw-r--r--  1 alex  staff  12142061169 Jul  3 19:10 tweets.csv
+-rw-r--r--  1 alex  staff  12142116283 Jul  3 19:10 tweets.csv
+...
+</pre>
+<p>My favorite tool, though, is <code>sh-avg</code>. Using <code>sh-avg</code>, you can compute the averages of numerical fields over the last several log messages. For example, to average the results from the “TrainEmbedding” service:</p>
+<pre>$ sh-avg TrainEmbedding
+size 10: cost=0.108642
+size 20: cost=0.108811
+size 50: cost=0.108578
+</pre>
+<p>You can also specify a particular average size (i.e. the number of log records to average):</p>
+<pre>$ sh-avg TrainEmbedding 32
+size 32: cost=0.108722
+</pre>
+<p>If you want to be able to quickly see averages from your phone or smartwatch, you can setup a job to log the averages of another job:</p>
+<pre>$ while (true) do sh-log EmbedAvg sh-avg TrainEmbedding 30; sleep 30; done
+</pre>
+<p>As you can see, StatusHub allows you to be a command-line ninja with magical logging powers.</p>
+<h3>Going crazy</h3>
+<p>Once you have basic building blocks like <code>sh-log</code> and <code>sh-stream</code>, the possibilities are boundless.</p>
+<p>With a pipe-based IRC client like <a href="http://tools.suckless.org/ii/">ii</a>, you can push chat logs to StatusHub in one terminal command. This makes it easy to keep tabs on IRC activity, even from devices without an IRC client (e.g. a smartwatch).</p>
+<p>You could also pipe <code>sh-stream</code> into <code>ii</code> in order to send log messages to someone on IRC. This might not seem useful, but it actually could be. For example, say you want to be notified when a process finishes running. You could run this in one terminal:</p>
+<pre>$ ./some_long_task; sh-log Notify echo 'Task done!'</pre>
+<p>And then in some other terminal, perhaps on some other machine, run something like this:</p>
+<pre>$ sh-stream Notify | send-irc-messages</pre>
+<h3>Using StatusHub yourself</h3>
+<p>The <a href="https://github.com/unixpickle/statushub#usage">StatusHub repository</a> has official installation instructions, but I thought I’d give a gist here as well. There are really three parts to a successful StatusHub installation:</p>
+<ol>
+<li>An <code>sh-server</code> process running on some internet-accessible machine. All of your devices should be able to connect to this machine over HTTP/HTTPS, either through a reverse proxy or via port forwarding.</li>
+<li>A set of jobs that do logging via the <code>sh-log</code> command. To have <code>sh-log</code> go to the correct server, you will need to set some environment variables.</li>
+<li>One or more devices from which you will consume logs. These devices simply need a browser, but you can also install the StatusHub commands and setup your environment variables accordingly.</li>
+</ol>
+</div><!-- .entry-content -->
+<!-- .entry-footer -->
+</article></body></html>

@@ -1,0 +1,31 @@
+<html><head></head><body><article class="post-89 post type-post status-publish format-standard hentry category-uncategorized" id="post-89">
+<header class="entry-header">
+<h1 class="entry-title">Slice Aliasing Is Nicer Than You Realize</h1> </header><!-- .entry-header -->
+<div class="entry-content">
+<p>Most languages handle array slicing in one of two ways: with copying or with aliasing. JavaScript copies:</p>
+<pre>var arr = [1, 2, 3];
+var arr1 = arr.slice(1, 2);
+arr[1] = 0;
+console.log(arr1); // prints [ 2 ]
+</pre>
+<p>Go, on the other hand, aliases:</p>
+<pre>arr := []int{1, 2, 3}
+arr1 := arr[1:2]
+arr[1] = 0
+fmt.Println(arr1) // prints [0]
+</pre>
+<p>Until yesterday, my ML framework’s <a href="https://github.com/unixpickle/anyvec">vector library</a> did not support aliasing. When you sliced a vector, you created a copy. I thought this would make things easier for a few reasons. For one, aliasing means that you have to worry about overlapping memory regions. Have you ever tried to implement your own version of <code>memmove()</code>? It’s not fun. However, after months of working with my framework, it became abundantly clear that aliasing would be nice to have.</p>
+<p>In my view, the biggest merit of aliasing is performance. Suppose I have a highly-optimized function <code>dot(x, y)</code> which computes the dot product of two vectors (i.e. arrays of numbers). If I want to use this to compute a matrix-vector product, I can call <code>dot</code> once for each row of the matrix. But wait: how do I extract each row from the matrix? If this is Go, I can create a reference to the row in constant time without copying any memory. If this is JavaScript, on the other hand, I have to use <code>slice()</code> to make a copy of the row. That’s obviously worse for performance, especially with GC overhead.</p>
+<p>Suppose I wanted to optimize the <code>dot</code> function in JavaScript by adding offset arguments, such as <code>dot(x, xOffset, y, yOffset)</code>. Now I could use the offset arguments instead of slicing. But wait, I just added two more arguments to my function! And what’s more, I have to add offset arguments to every similar math function I want to optimize. As someone who maintains a vector manipulation library, that seems like a lot of extra clutter.</p>
+<p>As a note, Java suffers from exactly what I described above. Since there’s no array aliasing, the <a href="https://docs.oracle.com/javase/7/docs/api/java/util/Arrays.html">Arrays</a> class is cluttered with method variants like <code>fill(short[] a, int fromIndex, int toIndex, short val)</code>. If Java arrays worked like Go slices, you wouldn’t need those pesky index arguments.</p>
+<p>You could avoid the extra arguments by wrapping every array in a type that looks something like this:</p>
+<pre>SlicedVector {
+  int    start;
+  int    length;
+  type[] backingArray;
+}</pre>
+<p>If all your APIs took these structures instead of arrays, then you could slice for free. But now you’ve implemented aliasing! You would have all the same problems you’d have with aliasing: overlapping array arguments, weird bugs relating to mutability, etc. So why not just use aliasing from the start?</p>
+<p>Overall, it’s surprising how little I thought about aliasing before creating my own vector library. Usually it’s not an issue. It was only yesterday, when I profiled a program and found that 30% of its overhead was coming from vector slicing, that I finally decided in favor of aliasing.</p>
+</div><!-- .entry-content -->
+<!-- .entry-footer -->
+</article></body></html>

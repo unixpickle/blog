@@ -1,0 +1,27 @@
+<html><head></head><body><article class="post-84 post type-post status-publish format-standard hentry category-uncategorized" id="post-84">
+<header class="entry-header">
+<h1 class="entry-title">The Bug That Wasted a Month of GPU Time</h1> </header><!-- .entry-header -->
+<div class="entry-content">
+<p>After getting my hands on a good GPU, I spent a month trying to train a single neural network. The network wasn’t even that special—it was just an image classifier. In case you don’t know, an image classifier tries to name the objects in images. You might show it a picture of a phone, for example, and it’d output something like “rotary phone”. This is an extremely popular application of neural networks, so I figured I was in for an easy ride.</p>
+<p>To my disappointment, the network was doing really poorly. I expected an error rate of about 7%, but I was getting more like 35%. I tried lots of different fixes: changing the batch size, using different optimization algorithms, and even tinkering with L2 regularization. Nothing seemed to help.</p>
+<p>I needed to be able to run experiments faster. After tweaking the network, I would have to wait a few days before seeing the (negative) results. I knew I hadn’t put much time into optimizing my code, so I figured I could squeeze more performance out of it. When I ran a profile, I found that most of the overhead wasn’t even coming from the network itself. Rather, data augmentation was taking up most of the training time.</p>
+<p>Tipped off by the profiler results, I tried to optimize the cropping code by combining it with some other image logic. This is when I really looked at the cropping function:</p>
+<pre>func crop(img image.Image, x, y int) image.Image {
+	res := image.NewRGBA(image.Rect(0, 0, InputImageSize,
+		InputImageSize))
+	for y := 0; y &lt; img.Bounds().Dy(); y++ {
+		for x := 0; x &lt; img.Bounds().Dx(); x++ {
+			c := img.At(x+img.Bounds().Min.X,
+				y+img.Bounds().Min.Y)
+			res.Set(x, y, c)
+		}
+	}
+	return res
+}
+</pre>
+<p>So, that code is pretty broken. For one thing, the x and y arguments are shadowed by the for loop variables, so I was always cropping the top-left corner out of every image. Second, the code was really slow because I was looping over the pixels of the larger image rather than only touching the pixels in the cropped region.</p>
+<p>So, why was my neural network so bad? Because I was always feeding it the top-left corner of its training images. I don’t know if you’ve noticed, but the subject of a picture is rarely in the top-left corner. All things considered, it’s amazing that the network could get 60% accuracy with such terrible inputs.</p>
+<p>Now for the good news. After I replaced the cropping code with something <em>sane</em>, the network learned to classify images very well. It was a <a href="https://arxiv.org/abs/1512.03385">ResNet-34</a>, and my results were comparable to the ones in the paper for the same network. And now that I finished what I set out to do, I have my GPU back. I can finally move on to more interesting things.</p>
+</div><!-- .entry-content -->
+<!-- .entry-footer -->
+</article></body></html>

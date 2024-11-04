@@ -1,0 +1,133 @@
+<html><head></head><body><article class="post-162 post type-post status-publish format-standard hentry category-uncategorized" id="post-162">
+<header class="entry-header">
+<h1 class="entry-title">Solving murder with Go</h1> </header><!-- .entry-header -->
+<div class="entry-content">
+<p>I recently saw a blog post entitled <a href="https://xmonader.github.io/prolog/2018/12/21/solving-murder-prolog.html">Solving murder with Prolog</a>. It was a good read, and I recommend it. One interesting aspect of the solution is that it reads somewhat like the original problem. Essentially, the author translated the clues into Prolog, and got a solution out automatically.</p>
+<p>This is actually an essential skill for programmers in general: good code should be readable, almost like plain English—and not just if you’re programming in Prolog. So today, I want to re-solve this problem in Go. As I go, I’ll explain how I optimized for readability. For the eager, <a href="https://gist.github.com/unixpickle/96979bb9f3ef9afa5ade3596bd308f1e">here</a> is the final solution.</p>
+<p>Constants are very useful for readability. Instead of having a magic number sitting around, try to use an intelligible word or phrase! Let’s create some constants for rooms, people, and weapons:</p>
+<pre>const (
+	Bathroom = iota
+	DiningRoom
+	Kitchen
+	LivingRoom
+	Pantry
+	Study
+)
+
+const (
+	George = iota
+	John
+	Robert
+	Barbara
+	Christine
+	Yolanda
+)
+
+const (
+	Bag = iota
+	Firearm
+	Gas
+	Knife
+	Poison
+	Rope
+)
+</pre>
+<p>The way I am solving the puzzle is as follows: we generate each possible scenario, check if it meets all the clues, and if so, print it out. To do this, we can store the scenario in a structure. Here’s how I chose to represent this structure, which I call <code>Configuration</code>:</p>
+<pre>type Configuration struct {
+	People  []int
+	Weapons []int
+}
+</pre>
+<p>Here, we represent the solution by storing the person and weapon for each room. For example, to see the person in the living room, we check <code>cfg.People[LivingRoom]</code>. To see the weapon in the living room, we do <code>cfg.Weapons[LivingRoom]</code>. This will make it easy to implement clues in a readable fashion. For example, to verify the final clue, we simply check that <code>cfg.Weapons[Pantry] == Gas</code>, which reads just like the original clue.</p>
+<p>Next, we need some way to iterate over candidate solutions. Really, we just want to iterate over possible permutations of people and weapons. Luckily, I have already made a library function to generate all permutations of N indices. Using this API, we can enumerate all configurations like so:</p>
+<pre>for people := range approb.Perms(6) {
+	for weapons := range approb.Perms(6) {
+		cfg := &amp;Configuration{people, weapons}
+		// Check configuration here.
+	}
+}
+</pre>
+<p>Note how this reads exactly like what we really want to do. We are looping through permutations of people and weapons, and we can see that easily. This is because we moved all the complex permutation generation logic into its own function; it’s abstracted away in a well-named container.</p>
+<p>Now we just have to filter the configurations using all the available clues. We can make a function that checks if each clue is satisfied, giving us this main loop:</p>
+<pre>for people := range approb.Perms(6) {
+	for weapons := range approb.Perms(6) {
+		cfg := &amp;Configuration{people, weapons}
+		if !clue1(cfg) || !clue2(cfg) || !clue3(cfg) ||
+			!clue4(cfg) || !clue5(cfg) ||
+			!clue6(cfg) || !clue7(cfg) ||
+			!clue8(cfg) || !clue9(cfg) {
+			continue
+		}
+		fmt.Println("killer is:", cfg.People[Pantry])
+	}
+}
+</pre>
+<p>Next, before we implement the actual clues, let’s implement some helper functions. Well-named helper functions greatly improve readability. Note in particular the <code>isMan</code> helper. It’s very clear what it does, and it abstracts away an arbitrary-seeming <code>3</code>.</p>
+<pre>func isMan(person int) bool {
+	return person &lt; 3
+}
+
+func indexOf(l []int, x int) int {
+	for i, y := range l {
+		if y == x {
+			return i
+		}
+	}
+	panic("unreachable")
+}
+</pre>
+<p>Finally, we can implement all the clues in a human-readable fashion. Here is what they look like:</p>
+<pre>func clue1(cfg *Configuration) bool {
+	return isMan(cfg.People[Kitchen]) &amp;&amp; (cfg.Weapons[Kitchen] == Knife || cfg.Weapons[Kitchen] == Gas)
+}
+
+func clue2(cfg *Configuration) bool {
+	if cfg.People[Study] == Barbara {
+		return cfg.People[Bathroom] == Yolanda
+	} else if cfg.People[Study] == Yolanda {
+		return cfg.People[Bathroom] == Barbara
+	} else {
+		return false
+	}
+}
+
+func clue3(cfg *Configuration) bool {
+	bagRoom := indexOf(cfg.Weapons, Bag)
+	if cfg.People[bagRoom] == Barbara || cfg.People[bagRoom] == George {
+		return false
+	}
+	return bagRoom != Bathroom &amp;&amp; bagRoom != DiningRoom
+}
+
+func clue4(cfg *Configuration) bool {
+	if cfg.Weapons[Study] != Rope {
+		return false
+	}
+	return !isMan(cfg.People[Study])
+}
+
+func clue5(cfg *Configuration) bool {
+	return cfg.People[LivingRoom] == John || cfg.People[LivingRoom] == George
+}
+
+func clue6(cfg *Configuration) bool {
+	return cfg.Weapons[DiningRoom] != Knife
+}
+
+func clue7(cfg *Configuration) bool {
+	return cfg.People[Study] != Yolanda &amp;&amp; cfg.People[Pantry] != Yolanda
+}
+
+func clue8(cfg *Configuration) bool {
+	firearmRoom := indexOf(cfg.Weapons, Firearm)
+	return cfg.People[firearmRoom] == George
+}
+
+func clue9(cfg *Configuration) bool {
+	return cfg.Weapons[Pantry] == Gas
+}
+</pre>
+<p>Most of these clues read almost like the original. I have to admit that the <code>indexOf</code> logic isn’t perfect. Let me know how/if you’d do it better!</p>
+</div><!-- .entry-content -->
+<!-- .entry-footer -->
+</article></body></html>

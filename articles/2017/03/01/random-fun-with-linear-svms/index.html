@@ -1,0 +1,33 @@
+<html><head></head><body><article class="post-72 post type-post status-publish format-standard hentry category-uncategorized" id="post-72">
+<header class="entry-header">
+<h1 class="entry-title">Random Fun with Linear SVMs</h1> </header><!-- .entry-header -->
+<div class="entry-content">
+<p>I was first introduced to <a href="https://en.wikipedia.org/wiki/Support_vector_machine">Support Vector Machines</a> by MIT’s <a href="https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-034-artificial-intelligence-fall-2010/lecture-videos/lecture-16-learning-support-vector-machines/">AI course</a>. The lecturer did a lot of math, arrived at a quadratic optimization problem, and then said “solving this is a job for a numerical analyst” (paraphrased). Discouraged, I went a while without implementing SVMs at all. Even after I had learned some numerical analysis, I still tended to prefer conceptually simpler models like neural networks or decision trees.</p>
+<p>A few days ago, I came to a realization that totally changed my feelings about SVMs. In particular, I realized that I could use the <a href="https://en.wikipedia.org/wiki/Hinge_loss">hinge loss</a> to train a regular neural network. Like any loss function, the hinge loss measures how well a model classifies inputs. However, it has a particular property that makes it special: when you minimize the hinge loss, you are essentially training an SVM.</p>
+<p>Suddenly, I had a way to work SVMs into my existing ML framework. An SVM can be trained just like a neural network, provided you use the right loss function (combined with <a href="https://en.wikipedia.org/wiki/Regularization_(mathematics)">L2 regularization</a>). All the complicating factors–stuff like kernels and quadratic programming–no longer seemed relevant. I finally had a way to benefit from SVMs without all the complications that seemed to come along with them.</p>
+<p>Implementing the hinge loss in <a href="https://github.com/unixpickle/anynet/blob/9c14e0b21ab1cdb36573af3a8eb7667470c2dbf2/cost.go#L118-L234">my own ML framework</a> was fairly simple, although I had trouble deciding which version of the multi-class hinge loss to use. Annoyingly, Wikipedia only mentioned one variant of said loss. Thanks to me, that is <a href="https://en.wikipedia.org/wiki/Hinge_loss#Extensions">now fixed</a>.</p>
+<p>Once I had an implementation of the hinge loss, I trained a linear SVM on the MNIST handwriting dataset. The results were amazing! After less than a second of training, the model had a 92% validation accuracy. But I didn’t want to stop there.</p>
+<p>Until this week, I have never used the <a href="https://www.cs.toronto.edu/~kriz/cifar.html">CIFAR dataset</a>. If you aren’t familiar, CIFAR is a database of labeled color images. For example, there are thousands of 32×32 images of cars, each labeled “automobile”. I trained a linear SVM on CIFAR-10 (a CIFAR dataset with 10 categories). The resulting SVM was able to classify 38% of images correctly, which is pretty impressive for such a simple model.</p>
+<p>Unlike most ML models, it is easy to visualize what a linear SVM is doing. For each class, the SVM finds a vector describing samples in that class. We can treat these vectors as images to see exactly what the SVM is looking for:</p>
+<table style="display: table; width: auto; margin: 0 auto 1em auto;">
+<tbody>
+<tr>
+<td>Car</td>
+<td>Boat</td>
+<td>Frog</td>
+<td>Horse</td>
+</tr>
+<tr>
+<td><img alt="" class="aligncenter size-full wp-image-73" height="32" src="img/1-1-1-1-1-1-1-automobile.png" width="32"/></td>
+<td><img alt="" class="aligncenter size-full wp-image-73" height="32" loading="lazy" src="img/1-1-1-1-1-1-1-ship-1.png" width="32"/></td>
+<td><img alt="" class="aligncenter size-full wp-image-73" height="32" loading="lazy" src="img/1-1-1-1-1-1-1-frog-1.png" width="32"/></td>
+<td><img alt="" class="aligncenter size-full wp-image-73" height="32" loading="lazy" src="img/1-1-1-1-1-1-1-horse-1.png" width="32"/></td>
+</tr>
+</tbody>
+</table>
+<p>You can probably see why the car is the way it is. The boat image is also somewhat obvious: most boats are brown-ish objects floating in a blue-ish ocean. The frog is also quite clear: frogs are approximately green blobs. If you squint closely enough at the horse, you can probably explain it as well.</p>
+<p>Perhaps the nicest thing about linear SVMs is that they learn so quickly. The CIFAR SVM took about 10 seconds to train. The MNIST SVM took less than a second. That’s something you don’t get from the typical neural network.</p>
+<p>Now that I have had some fun with linear SVMs, I hope that they will become part of my everyday ML process. In the very least, they can often give a good baseline for classification accuracy.</p>
+</div><!-- .entry-content -->
+<!-- .entry-footer -->
+</article></body></html>

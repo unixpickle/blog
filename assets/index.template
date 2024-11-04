@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pickled ML</title>
+    <link rel="stylesheet" type="text/css" href="/assets/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <img src="/assets/pickle.png" class="navbar-logo">
+        <label class="navbar-title">Pickled ML</label>
+    </nav>
+    <article>
+        <h1>Posts</h1>
+        <ul class="article-list">
+            {{range .}}
+                <li>
+                    <a href="/{{.Date.Year}}/{{printf "%02d" .Date.Month}}/{{printf "%02d" .Date.Day}}/{{.ShortName}}/">
+                        {{.Title}}
+                        <label class="article-date">({{printf "%02d" .Date.Month}}/{{printf "%02d" .Date.Day}}/{{.Date.Year}})</label>
+                    </a>
+                </li>
+            {{end}}
+        </ul>
+    <article>
+</body>
+</html>
