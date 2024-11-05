@@ -4,27 +4,28 @@ body {
     line-height: 1.6;
     color: #333;
     background-color: #f0f0f0;
-    padding: 0;
     margin: 0;
+    padding: 40px 0 0 0;
 }
 
 article {
     max-width: 700px;
-    margin: 80px auto;
-    padding: 20px 40px 40px 40px;
+    margin: 40px auto;
+    padding: 20px 40px;
     box-sizing: border-box;
     background-color: white;
+    box-shadow: 0 0 10px 0 rgb(0, 0, 0, 0.3);
 }
 
 @media (max-width: 740px) {
     article {
-        margin: 60px 20px;
+        margin: 20px;
     }
 }
 
 @media (max-width: 500px) {
     article {
-        margin: 40px 0px;
+        margin: 0;
     }
 }
 
@@ -38,6 +39,7 @@ nav.navbar {
     left: 0;
     background-color: white;
     text-align: center;
+    box-shadow: 0 0 10px 0 rgb(0, 0, 0, 0.3);
 }
 
 nav.navbar a {
@@ -182,6 +184,18 @@ figure img {
     width: 100%;
     margin: 0 0 1.6em;
     table-layout: fixed;
+}
+
+@media (max-width: 700px) {
+    .scrolling-table {
+        overflow-x: scroll;
+    }
+
+    .scrolling-table table {
+        width: auto;
+        margin-left: auto;
+        margin-right: auto;
+    }
 }
 
 .wp-block-table table,

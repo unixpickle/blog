@@ -13,6 +13,7 @@
 </ol>
 <p>With our network laid out, we can talk a bit about data. A while ago I had used the <a href="http://www.speech.cs.cmu.edu/cgi-bin/cmudict">CMU pronunciation dictionary</a> for a speech synthesis project, and I repurposed that dictionary as network training data. After a bit of preprocessing, I split the dictionary up into 105,139 training samples and 11,474 testing samples (where a sample is a single word). Uncompressed, this data was a bit over 2MB. The neural network, on the other hand, was only 1.8MB. This meant that, in the very least, the network couldn’t simply store an uncompressed copy of the data.</p>
 <p>When I went to train the network, I found that it learned quite quickly. In fact, I started by training the network on a single core of a <a href="https://twitter.com/unixpickle/status/825904601882836992">10-year-old iMac</a>. A single epoch took a few hours, but the result was fairly satisfying. I ran the network on a few random words to see what it could come up with:</p>
+<figure class="wp-block-table">
 <table>
 <tbody>
 <tr>
@@ -42,8 +43,10 @@
 </tr>
 </tbody>
 </table>
+</figure>
 <p>None of these words have a one-to-one mapping between phonemes and letters. In “invader”, the letter “a” only has the <code>/eI/</code> sound because it is followed by “de”. In “twelve”, we see the general rule that words cannot end in a “v”. In “evaluate”, “e” is added to the end of the word to give the last “a” an <code>/eI/</code> sound. The last example is particularly notable because the network got it wrong. Not many words are spelled like “guilty”, so this mistake is unsurprising (the fact that “guilty” is a common word has no effect; see my note at the bottom about word frequency).</p>
 <p>The trained network had a validation success rate of about 40%, meaning that it could correctly spell 40% of the words it had never seen before. This didn’t seem impressive, but I didn’t want to judge without trying myself. I selected 19 random words from the validation set and tried to spell them based on their IPA transcriptions. It was harder than I expected. The dictionary contains a huge number of uncommon words (e.g., city names, names of plants, etc.). I was only able to spell 9 out of the 19 words (47%). This should give you an idea of what I was up against:</p>
+<figure class="wp-block-table scrolling-table">
 <table>
 <tbody>
 <tr>
@@ -78,6 +81,7 @@
 </tr>
 </tbody>
 </table>
+</figure>
 <p>At this point, I started wondering about overfitting. After training for one epoch, cross-validation indicated that virtually no overfitting had taken place. However, I knew that further training might cause the network to lose its ability to generalize to new words. When you think about it, though, humans probably overfit spelling ourselves. Most of us can think of times when we’ve overthought the spelling of a word and ended up misspelling it as a result. In some sense, we tend to focus on weird edge cases, leading us to overthink words with normal spellings. So, as an experiment, I set out to intentionally overfit a network on spelling.</p>
 <p>I started by training the existing 1.8MB network for more epochs. Its validation success rate stabilized at around 41%, while the training success rate inched up to 48%. Encouragingly, the validation score never got worse. Eager to force a network to memorize more English spelling, I increased the number of neurons in the network. The new network took up an alarming 7MB, but it still only achieved a 44% validation success rate and a 56% training success rate. Annoyingly, that’s still an <a href="https://en.wikipedia.org/wiki/Grading_(education)">F</a>, albeit on the world’s hardest spelling test. My conclusion was that humans aren’t the only “neural” entities that struggle with spelling tests.</p>
 <p>One final thing to note is that my experiments <strong>weighted every word equally.</strong> In reality, English words are distributed on a <a href="https://en.wikipedia.org/wiki/Zipf's_law">heavy-tailed probability distribution</a>. It is undoubtable that people are better at spelling common words than extremely infrequent ones. In fact, one can sometimes get by with <a href="https://blog.xkcd.com/2015/09/22/a-thing-explainer-word-checker/">only 1000 words</a>. The takeaway is that, while a 50% success rate might not sound impressive, it could be more than enough.</p>
