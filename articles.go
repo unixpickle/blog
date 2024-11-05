@@ -11,6 +11,8 @@ import (
 	"golang.org/x/net/html"
 )
 
+const IndexFilename = "index.html"
+
 type ArticleDate struct {
 	Year  int
 	Month int
@@ -39,7 +41,7 @@ func Articles(rootDir string) ([]*ArticleInfo, error) {
 		if info.IsDir() {
 			return nil
 		}
-		if info.Name() == "index.html" {
+		if info.Name() == IndexFilename {
 			h1Content, err := extractFirstH1(path)
 			if err != nil {
 				return fmt.Errorf("error extracting H1 from %s: %w", path, err)

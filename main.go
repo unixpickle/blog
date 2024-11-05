@@ -30,6 +30,7 @@ func main() {
 	flag.Parse()
 
 	fs := http.FileServer(http.Dir(server.AssetDir))
+	http.Handle("/favicon.ico", fs)
 	http.Handle("/assets/", http.StripPrefix("/assets/", fs))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "" || r.URL.Path == "/" {
@@ -97,7 +98,7 @@ func (s *Server) serveArticle(
 		relpath = relpath[1:]
 	}
 	if relpath == "" {
-		relpath = "index.html"
+		relpath = IndexFilename
 	}
 	localPath := article.Dir
 	for _, comp := range strings.Split(relpath, "/") {
@@ -107,7 +108,7 @@ func (s *Server) serveArticle(
 	if err != nil {
 		return err
 	}
-	if relpath == "index.html" {
+	if relpath == IndexFilename {
 		contents, err := os.ReadFile(localPath)
 		if err != nil {
 			return err
