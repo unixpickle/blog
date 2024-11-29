@@ -139,6 +139,10 @@ figure {
     max-width: 100%;
 }
 
+.wp-block-gallery figure {
+    margin: 0 auto;
+}
+
 figcaption {
     font-size: 0.9em;
     color: #666;
@@ -250,4 +254,16 @@ a {
 a:hover {
     color: #888;
     text-decoration: none;
+}
+
+/* Footnotes */
+
+
+.footnote-pointer a {
+    scroll-margin-top: 60px;
+}
+
+.entry-footnotes {
+    border-top: 1px solid #d5d5d5;
+    font-size: 0.8em;
 }

@@ -1,0 +1,591 @@
+<html>
+
+<head>
+    <meta property="og:title" content="Honeycrisp: An Apple-First Deep Learning Framework" />
+    <meta property="og:description" content="I've been working on a deep learning framework in Swift for Apple Silicon." />
+    <meta property="og:image" content="https://blog.aqnichol.com/2024/11/29/honeycrisp-a-deep-learning-framework/img/banner.jpg" />
+    <meta property="og:url" content="https://blog.aqnichol.com/2024/11/29/honeycrisp-a-deep-learning-framework" />
+    <meta property="og:type" content="website" />
+    <link rel="stylesheet" href="hljs/stackoverflow-light.min.css" type="text/css">
+</head>
+
+<body>
+    <article class="post-581 post type-post status-publish format-standard hentry category-uncategorized" id="post-581">
+        <header class="entry-header">
+            <h1 class="entry-title">Honeycrisp: An Apple-First Deep Learning Framework</h1>
+        </header><!-- .entry-header -->
+        <div class="entry-content">
+            <p>
+                Over the past few months, I've been working on a new side project:
+                <a href="https://github.com/unixpickle/honeycrisp">Honeycrisp</a>,
+                a deep learning framework written in Swift and designed for the Mac.
+                My goal with Honeycrisp was to build a framework that felt truly
+                different from the status quo&mdash;something more <i>Apple</i>.
+            </p>
+            <p>
+                For me, part of the fun of building Honeycrisp was being re-introduced to the Apple ecosystem.
+                Earlier this year, I decided to <a href="https://github.com/unixpickle/learn-swift">learn Swift</a>,
+                the programming language of modern Mac and iPhone development.
+                Meanwhile, after doing some research on Apple's specialized deep learning hardware, I couldn't resist
+                buying myself a Mac Studio. This was the first Apple computer I've purchased in over a decade.
+            </p>
+            <p>
+                After buying a Mac, I knew what I was in for.
+                I had mentally signed myself up to build a framework in Swift that I could use on
+                this Mac for all of my future deep learning hobby projects.
+            </p>
+            <p>The best way to test and improve something is to use it yourself,
+                and that's exactly what I've been doing with Honeycrisp. For example, I recently trained
+                a small <a href="https://github.com/unixpickle/HCText2Image">text-to-image model</a>
+                on my Mac using Honeycrisp. With each new project I build on top of this framework,
+                I expect to discover more missing features and bugs that I would have missed otherwise.</p>
+            <figure
+                class="wp-block-gallery has-nested-images columns-default is-cropped wp-block-gallery-1 is-layout-flex">
+                <figure class="wp-block-image size-large"><img alt="An image of a red heart." src="img/heart.png" />
+                </figure>
+                <figure class="wp-block-image size-large"><img alt="An image of a cartoon tree." src="img/tree.png" />
+                </figure>
+                <figure class="wp-block-image size-large"><img alt="A smiley face emoji with a big nose."
+                        src="img/smiley.png" /></figure>
+                <figure class="wp-block-image size-large"><img alt="A white lightbulb icon with a blue background."
+                        src="img/lightbulb.png" /></figure>
+                <figure class="wp-block-image size-large"><img alt="A sun icon with white in the center."
+                        src="img/sun.png" /></figure>
+                <figure class="wp-block-image size-large"><img alt="A blurry, messed up clock icon."
+                        src="img/clock.png" /></figure>
+                <figcaption class="blocks-gallery-caption wp-element-caption">Cherry-picked samples from HCText2Image, a
+                    small image generator trained with Honeycrisp on a single Mac.</figcaption>
+            </figure>
+
+            <h2>Why not MLX?</h2>
+
+            <p>I haven't forgotten about
+                <a href="https://github.com/ml-explore/mlx">MLX</a>, Apple's own deep learning framework. In general,
+                the MLX team has built something great, with well-optimized Metal kernels and a really clean codebase.
+            </p>
+            <p>However, I don't feel that MLX is substantially different from the frameworks I've used on other
+                platforms, and it doesn't feel like a real <i>Apple</i> framework.
+                Just like frameworks built for other platforms, MLX is written in C++ and focuses on its Python
+                front-end.
+                It <a href="https://github.com/ml-explore/mlx/issues/18#issuecomment-1846492294">doesn't even
+                    support</a> specialized hardware like the Apple Neural Engine.</p>
+            <p>While MLX does include Swift bindings, they are feature-incomplete<sup class="footnote-pointer"><a
+                        href="#footnote-content-1" id="footnote-src-1">1</a></sup>
+                and don't take full advantage of modern Swift features like
+                <a href="https://developer.apple.com/documentation/swift/task">Tasks</a>,
+                <a
+                    href="https://developer.apple.com/documentation/foundation/archives_and_serialization/encoding_and_decoding_custom_types">the
+                    Codable protocol</a>,
+                property wrappers<sup class="footnote-pointer"><a href="#footnote-content-2"
+                        id="footnote-src-2">2</a></sup>,
+                the <code>...</code> operator in subscripts,
+                and stack tracing macros like <code>#file</code> and <code>#line</code>.
+                In my opinion, the Swift front-end for MLX feels like any other Swift
+                bindings for a framework that was not built with Apple developers in mind.
+            </p>
+            <p>In some of the following sections, I will compare Honeycrisp to MLX. I don't want my criticisms of MLX to
+                be hurtful to the MLX team. Instead, I'd love to see these criticisms lead to useful discussions and
+                tangible improvements.</p>
+
+            <h2>A quick overview: tensors and operations</h2>
+            <p>Before diving into how Honeycrisp works and what makes it unique, let's give a few examples of Honeycrisp
+                code.</p>
+            <p>The fundamental data-type in Honeycrisp is a <code>Tensor</code>, which is a multi-dimensional array of
+                data. As in other array libraries, every tensor has a shape that defines its size along each dimension.
+                For example, a 1-D array of 100 elements would have shape <code>[100]</code>. A 2-D array could have shape
+                <code>[2, 3]</code> to represent 2 as the outer (row) dimension and 3 as the inner (column) dimension.
+            </p>
+            <p>When we create a tensor, we can do so with a combination of raw data and a shape:</p>
+            <pre class="swift-code">
+// Creat the following matrix:
+//   1  2  3
+//   4  5  6
+let matrix = Tensor(
+    data: [1, 2, 3, 4, 5, 6],
+    shape: [2, 3]
+)</pre>
+            <p>We can perform operations on a tensor using operators or methods:</p>
+            <pre class="swift-code">
+let matrixPlus1 = matrix + 1 // Adds 1 to every element
+let sumOfColumns = matrix.sum(axis: 1) // Result: [6 15]</pre>
+
+            <p>Every <code>Tensor</code> also has a data type, i.e. the type of elements that it stores. In the
+                above
+                examples, we created tensors of integers, so the data type defaults to <code>.int64</code>.
+                We can explicitly specify the data type when creating a tensor, and we can convert data types as
+                well:</p>
+            <pre class="swift-code">
+let xFloat = Tensor(
+    data: [1, 2, 3],
+    shape: [3],
+    dtype: .float32
+)
+let xInt = xFloat.cast(.int64)
+
+// Would fail with an error, due to mismatched data types:
+let sum = xFloat + xInt</pre>
+
+            <h2>Everything as an asyncronous task</h2>
+            <p>Like in many other deep learning frameworks, all computations in Honeycrisp are performed
+                asynchronously.
+                In particular, when we perform an operation on <code>Tensor</code> objects, we get a new
+                <code>Tensor</code> immediately.
+                When we want an actual result, we need to use <code>try await</code> to wait for
+                the computation to finish and handle any errors encountered along the way:
+            </p>
+            <pre class="swift-code">
+try await tensor.data // Get the raw data
+try await tensor.floats() // Get a [Float]
+try await tensor.item() // Get a Float</pre>
+            <p>While asynchronous computation is a popular design decision amongst deep learning frameworks, it is uniquely
+                necessary
+                for a Swift-first framework due to how Swift implements error handling. In Swift, exceptions cannot
+                be raised from arithmetic operators like <code>+</code>. Furthermore, every call to a method which
+                raises an exception requires an explicit <code>try</code> keyword. Honeycrisp would be at a grave
+                disadvantage over Python frameworks if code looked like this:
+            </p>
+            <pre class="swift-code">
+// Hypothetical bad code without async computation
+let x = try add(a, b) // can't use + operator
+let y = try x.sum(axis: 1)
+let z = try layer2(z).gelu()
+let out = try z.item()</pre>
+            <p>In comparison, we avoid this with asynchronous computation, by pushing error handling until
+                the end:</p>
+            <pre class="swift-code">
+let x = a + b
+let y = x.sum(axis: 1)
+let z = layer2(z).gelu()
+let out = try await z.item()</pre>
+            <p>Asynchronous computation in Honeycrisp heavily leans on the <a
+                    href="https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/">Swift
+                    concurrency model</a>. The data of a <code>Tensor</code> object is stored as a
+                <code>Task&lt;Tensor.Data, Error&gt;</code> instance variable. When requesting the result of an
+                operation, we literally just <code>await</code> the result of this data task.
+            </p>
+            <p>One final thing to note is that some operations fail synchronously and abort program execution.
+                These are errors like shape or type mismatches that can be caught right away and are
+                considered user mistakes rather than runtime errors. This is also <i>necessary</i> because every
+                <code>Tensor</code>
+                knows its shape and data type immediately, even before computation completes, and Honeycrisp
+                does not provide a way to represent a tensor with an invalid shape or type.
+            </p>
+
+            <h2>Modular backends</h2>
+            <p>Each Mac and iPhone has at least three different types of hardware
+                acceleration for matrix multiplication: the GPU, the
+                <a href="https://en.wikipedia.org/wiki/Neural_Engine">Apple Neural Engine</a>
+                (ANE), and special
+                <a href="https://github.com/corsix/amx">AMX instructions</a> on the CPU.
+                A deep learning framework should be able to leverage all three of these accelerators, possibly even
+                concurrently in the same training job.
+            </p>
+            <p>In Honeycrisp, operations are implemented inside of a <code>Backend</code>, and different backends can
+                provide interfaces to different hardware. At runtime, we can swap out the backend even at the
+                granularity of individual lines of code in our model.
+                For example, we could mix the CPU and GPU like so:</p>
+            <pre class="swift-code">
+Backend.defaultBackend = try MPSBackend() // Use the GPU by default
+let cpuBackend = CPUBackend()
+let x = Tensor(rand: [128, 128]) // Performed on GPU
+let y = cpuBackend.use { x + 3 } // Performed on CPU
+let z = y - 3 // Performed on GPU</pre>
+            <p>Unlike in other frameworks, a <code>Backend</code> can be implemented
+                natively in Swift, and Honeycrisp already includes the following backends:</p>
+            <ul>
+                <li>A backend which performs matrix multiplication on the ANE using CoreML.
+                </li>
+                <li>A backend for automatically counting the FLOPs of the operations performed on it. This backend
+                    can wrap any existing backend.</li>
+                <li>A backend for running operations on the GPU with Metal Performance Shaders.</li>
+            </ul>
+            <p>In theory, it is even possible to implement a backend for other GPU hardware, such as a CUDA backend
+                that we could use on Linux.</p>
+            <p>In contrast to Honeycrisp, MLX only supports the CPU and GPU, and this choice is deeply ingrained
+                in the codebase. In particular, all operations (and there's many of them) have an
+                <code>eval()</code> and <code>eval_gpu()</code> method. As you can imagine, this design
+                makes it easy to add new operations but difficult to
+                add new backends (now you must add a new <code>eval_XYZ</code> method to <i>every</i> operation). The
+                thing is,
+                new operations don't come along very often in deep learning, but in the Apple ecosystem
+                it seems that new accelerators come along fairly frequently. As a consequence, I'd argue
+                that MLX's design is the "transpose" of what it should be.
+            </p>
+
+            <h2>Automatic differentiation</h2>
+            <p>When training neural networks, we typically rely on a deep learning framework to compute derivatives for us; this is called <i>automatic differentiation</i>.</p>
+            <!--
+            <p>When training a neural network, we want to find parameters that minimize some
+                loss function. This is typically done using gradients, i.e. the partial derivatives of the loss
+                with respect to the parameters of the model.</p>
+            <p>Most of the time, a deep learning framework should compute gradients for us.
+                From a user's point of view, we simply create tensors representing our parameters,
+                calculate some loss function using these tensors, and let the framework do the rest.
+                This is referred to as "automatic differentiation".
+            </p>-->
+            <p>Honeycrisp's low-level API for automatic differentiation looks a bit different than that
+                found in other frameworks. In the next section, you will see that it's typically not
+                necessary to use this API directly, but its implementation is still noteworthy.</p>
+            <p>During the backward pass, gradients are passed to each tensor via a callback.
+                We can register a callback using the <code>Tensor.onGrad</code> method:
+            </p>
+            <pre class="swift-code">
+// The raw parameter data that we want gradients for.
+let xData = Tensor(data: [1.0, 2.0, 3.0])
+
+// This is where we will store the gradients.
+var grad: Tensor?
+
+// Create a callback to set `grad` to the gradient.
+// The new tensor `x` has the same data as `xData` but
+// now does something during the backward pass.
+let x = xData.onGrad { g in grad = g }
+
+// Compute a loss function.
+let loss = x.pow(2).sum().sqrt()
+
+// Perform backpropagation to compute gradients.
+loss.backward()
+
+// We can now see the gradient:
+print(try await grad!.floats())</pre>
+            <p>In most deep learning frameworks, automatic differentiation is implemented by explicitly
+                tracking a graph of operations and then computing gradients through this graph. In Honeycrisp, there
+                is
+                no explicit graph tracking; instead, the graph is implicitly tracked by capturing variables in Swift
+                blocks.</p>
+            <p>We can see how this works by looking at the internal implementation of a differentiable operation.
+                First, if our operation depends on an input, we create a "handle" to this input by calling
+                <code>input.saveForBackward()</code>. We then create a block (Swift's version of an anonymous
+                function)
+                that implements the backward pass for this operation. This block captures the input handle by
+                calling
+                <code>handle.backward()</code> somewhere inside. Here is a simplified example:
+            </p>
+            <pre class="swift-code">
+public static func - (lhs: Tensor, rhs: Tensor) -> Tensor {
+  let backend = Backend.current // The task-local backend that is being used
+  let newData = createDataTask(lhs, rhs) { lhs, rhs in
+    // Simplified, but basically true: we use the backend to compute resulting tensor data.
+    try await backend.someMethod(lhs, rhs)
+  }
+  if !Tensor.isGradEnabled || (!lhs.needsGrad && !rhs.needsGrad) {
+    // Our result does not require gradients.
+    return Tensor(dataTask: newData, shape: outputShape, dtype: lhs.dtype)
+  } else {
+    // Create references to the arguments.
+    let lhsHandle = lhs.saveForBackward()
+    let rhsHandle = rhs.saveForBackward()
+    return Tensor(dataTask: newData, shape: outputShape, dtype: lhs.dtype) { grad in
+      // This block captures lhsHandle and rhsHandle and will release them
+      // when the resulting tensor is released.
+      lhsHandle.backward(backend) { grad }
+      rhsHandle.backward(backend) { -grad }
+    }
+  }
+}</pre>
+            <p>During the backward pass, gradients for a tensor are accumulated each
+                time a handle's <code>backward()</code> method is called. Once all of a tensor's handles have been
+                released, the tensor runs its own backward block on the accumulated gradient. If we create
+                a tensor that is not used, then the handles that this tensor created for its backward implementation
+                will automatically be released when the tensor itself is released
+                (thanks to the automatic reference counter).</p>
+
+            <h2>Declaring neural networks</h2>
+            <p>In frameworks like PyTorch, it is typical to define our neural network as a nested hierarchy of
+                modules (which are themselves just classes). Among other benefits, this makes it easy to keep track
+                of all the neural network's learnable parameters in one place.</p>
+            <p>In particular, we want each class to
+                automatically keep track of its own parameters, as well as all of its children with their own nested
+                parameters. In Honeycrisp, we can do this by subclassing <code>Trainable</code> and using property
+                wrappers:</p>
+            <pre class="swift-code">
+class MyModel: Trainable {
+    // A parameter which will be tracked automatically
+    @Param var someParameter: Tensor
+    
+    // We can also give parameters custom names
+    @Param(name: "customName") var otherParameter: Tensor
+    
+    // A sub-module whose parameters will also be tracked
+    @Child var someLayer: Linear
+    
+    override init() {
+        super.init()
+        self.someParameter = Tensor(data: [1.0])
+        self.otherParameter = Tensor(zeros: [7])
+        self.someLayer = Linear(inCount: 3, outCount: 7)
+    }
+    
+    func callAsFunction(_ input: Tensor) -> Tensor {
+        // We can access properties like normal
+        return someParameter * (someLayer(input) + otherParameter)
+    }
+}</pre>
+            <p>One really nice thing about this example is that our model code can use <code>someParameter</code> as
+                if it were a regular <code>Tensor</code>. However, it's not! In reality, it's actually a property
+                wrapper of type <code>Trainable.Parameter</code> which accumulates gradients automatically during
+                the backward pass. If we want the gradient explicitly, we can use projected values, like
+                <code>$someParameter.grad</code>.
+            </p>
+            <p>In practice, we typically won't access the parameters directly this way. Rather, every
+                <code>Trainable</code>
+                automatically implements a <code>parameters</code> property
+                that returns a mapping from parameter names to parameter objects. We can pass this mapping directly to
+                an optimizer and it will manage gradients for us:
+            </p>
+
+            <pre class="swift-code">
+let model = MyModel()
+
+// Create an optimizer that references the model's parameters
+let optimizer = Adam(model.parameters, lr: 0.001)
+
+let loss = someLossFunction(model)
+loss.backward()
+optimizer.step() // Automatically updates the data inside of each parameter
+optimizer.clearGrads() // Clears out the grad of each parameter</pre>
+
+            <h2>Serializing models</h2>
+            <p>The Swift standard library makes it easy to encode objects into various formats; all you need to do is
+                implement the <a href="https://developer.apple.com/documentation/swift/codable">Codable</a> protocol. In
+                Honeycrisp, we can save and restore
+                tensors by using the <code>TensorState</code> class, which implements <code>Codable</code> for us.</p>
+            <pre class="swift-code">
+// Example model state which implements Codable.
+// Note how we use TensorState instead of Tensor.
+struct MyModelState: Codable {
+    let stepIndex: Int
+    let myTensor: TensorState
+}
+
+// Example of a Tensor that we'd like to save/restore.
+let myTensor = Tensor(data: [1, 2, 3], shape: [3])
+
+// Create the Codable object to save.
+let state = MyModelState(
+    stepIndex: 1000,
+    myTensor: try await myTensor.state() // Get a TensorState
+)
+
+// Encode as a binary property list
+let data = try PropertyListEncoder().encode(state)
+
+// Decode the binary property list
+let decoder = PropertyListDecoder()
+let loadedState = try decoder.decode(MyModelState.self, from: data)
+
+// Turn the TensorState back into a Tensor
+let myTensorLoaded = Tensor(state: loadedState.myTensor)</pre>
+            <p>In the example above, we used Swift's built-in support for Property List files.
+                A really nice feature of this particular format is that Xcode provides a GUI to view and edit it.</p>
+            <p>Want to change the name of some parameter? Just double-click to rename.
+                Want to remove the optimizer state from a final checkpoint before shipping the weights?
+                Simply delete a row with the click of a button.
+                This might seem like a pretty silly thing to be happy about, but it really does save
+                some otherwise annoying scripting.</p>
+
+            <figure class="wp-block-image size-full">
+                <img alt="An Xcode window showing a property list editor. The root keys are opt, model, step, dataset, and gradScale."
+                    src="img/xcode_plist.png" />
+                <figcaption class="blocks-gallery-caption wp-element-caption">
+                    Editing a model checkpoint using Xcode's UI for editing Binary Property List files.
+                </figcaption>
+            </figure>
+
+            <h2>Errors with stack traces</h2>
+            <p>I've used Python for the majority of my deep learning career. When a Python program
+                crashes due to an exception, it will automatically print a stack trace.
+                This is very helpful for debugging large experiments, especially ones that are running
+                across multiple machines. In this scenario, looking at logs is often the easiest
+                (and most effective) first step of debugging.</p>
+            <p>With this in mind, I was very surprised to find out what happens when you run into an error
+                in a framework like MLX for Swift. Instead of a helpful stack trace, your program prints a
+                small, out-of-context error message before terminating. If you want to dig into the cause,
+                you'll have to rerun the program with a debugger attached.</p>
+            <p>To give an example, here's the output from a shape error:</p>
+            <pre>MLX error: Shapes (500000,2,1) and (1,1000000,1) cannot be broadcast. at /Users/alex/Library/Developer/Xcode/DerivedData/TryMLX-aoumphwiplvicwcvxxqqursdoazy/SourcePackages/checkouts/mlx-swift/Source/Cmlx/include/mlx/c/ops.cpp:24
+Program ended with exit code: 255</pre>
+            <p>Similarily, if you run into an out-of-memory error:</p>
+            <pre>libc++abi: terminating due to uncaught exception of type std::runtime_error: Attempting to allocate 4000000000000 bytes which is greater than the maximum allowed buffer size of 17179869184 bytes.</pre>
+            <p>In Honeycrisp, we can do much better. Even though Swift doesn't have native
+                support for printing stack traces, it provides a nifty trick.
+                Using default arguments and built-in macros, a function can observe the code location that called it:
+            </p>
+            <pre class="swift-code">
+func myFunction(..., file: StaticString = #file, line: UInt = #line) {
+    // Push the caller (file, line) to the stack trace.
+    ...
+    // Pop the last caller from the stack trace
+}</pre>
+            <p>It would be pretty tedious to manually apply this trick to every function and
+                method throughout a codebase. Luckily, we can use macros to do most of the work.
+                Every method in Honeycrisp is wrapped with a <code>@recordCaller</code> macro, which
+                automatically adds arguments to the method and wraps the function body in a stack trace
+                push/pop.</p>
+            <p>The end result is that any error in Honeycrisp includes a stack trace.
+                This stack trace may be incomplete for a few reasons, but it will typically at least
+                indicate the external code location that triggered an error within Honeycrisp.
+                This is often exactly what we need for debugging.</p>
+            <p>For example, here's a shape error in Honeycrisp. Note that the stack trace begins with some
+                user code in <code>Entrypoint.swift:37</code>, which is the line where a Honeycrisp
+                method was called with badly shaped tensors.
+            </p>
+            <pre>HCBacktrace/Backtrace.swift:182: Fatal error: 
+
+Traceback:
+
+run() at Entrypoint.swift:37
+  _add(_:thenMul:) at .../.build/checkouts/honeycrisp/Sources/Honeycrisp/FusedOps.swift:44
+    _lazyBroadcast(_:) at .../.build/checkouts/honeycrisp/Sources/Honeycrisp/Broadcast.swift:205
+      _broadcastShape(_:) at .../.build/checkouts/honeycrisp/Sources/Honeycrisp/Broadcast.swift:304
+
+Fatal error: shapes [50000, 2] and [1, 100000] do not support broadcasting</pre>
+            <p>Even when an asynchronous task raises an error, for example due to an allocation
+                failure in a backend, this error will include the context of the original
+                <code>Tensor</code> operation which created the task.
+            </p>
+            <pre>Error: Error at:
+
+run() at Entrypoint.swift:38
+  _add(_:thenMul:) at.../.build/checkouts/honeycrisp/Sources/Honeycrisp/FusedOps.swift:51
+    _createDataTask(_:_:_:_:) at .../.build/checkouts/honeycrisp/Sources/Honeycrisp/Tensor.swift:519
+
+Error: allocationFailed(4000000000)</pre>
+            <p>Unfortunately, there is one annoying limitation of stack traces in Honeycrisp.
+                At the moment, overloaded arithmetic operators like
+                <code>+</code>
+                <a href="https://github.com/swiftlang/swift/issues/54301">
+                    do not support tracking the caller's code location</a>.
+                As a result, stack traces will miss the caller of these operators.
+                I truly hope this hole in the Swift language gets filled soon!
+            </p>
+
+            <h2>Indexing operations</h2>
+            <p>We can use the subscript operator on a tensor to select subsets of it. For example, we can lookup a given
+                coordinate in a matrix like so:</p>
+            <pre class="swift-code">
+let matrix = Tensor(data: [1, 2, 3, 4, 5, 6], shape: [2, 3])
+matrix[1, 2] // value is 6
+matrix[0, -1] // value is 3
+matrix[-1, 0] // value is 4</pre>
+            <p>Note that these indexing operations actually return another <code>Tensor</code>, in this case of shape
+                <code>[]</code> (i.e. a single scalar value).
+            </p>
+            <p>Indexing operations need not return a 0-dimensional tensor. We can also use them to slice out a
+                sub-tensor:</p>
+            <pre class="swift-code">
+let firstRow = matrix[0] // shape: [3]
+let firstColumn = matrix[..., 0] // shape: [2]
+let lastColumn = matrix[..., -1] // shape: [2]</pre>
+            <p>We have seen that we can index a tensor using <code>tensor[index]</code>, but
+                I never elaborated on the type that <code>index</code> can have.
+                In Honeycrisp, you can use any index that implements the <code>TensorIndex</code> protocol.
+                In practice, this protocol is implemented for various helpful types already. For example,
+                <code>Range&lt;Int&gt;</code> can be used to slice a range of an axis, and helper types like
+                <code>PermuteAxes</code> can be used to rearrange entire chunks of data in a tensor.
+                Furthermore, we can combine multiple different indices along different axes using
+                commas within the brackets:
+            </p>
+            <pre class="swift-code">
+// Take the first row, and the first three columns
+x[0, ...2]
+
+// Swap the second and third dimension
+x[PermuteAxes(0, 2, 1)]
+
+// Skip the first two rows, and swap the second and third dimension:
+x[2..., PermuteAxes(0, 1)]</pre>
+
+            <h2>Performance</h2>
+            <p>While I spent most of my time implementing features to make Honeycrisp pleasant to use, I did spend
+                a bit of time tuning performance. For example, I implemented Metal kernels for fused log-softmax,
+                normalization, Adam updates, and a few other operations.
+                However, I am not a kernel connoisseur, and I leaned heavily on
+                <a href="https://developer.apple.com/documentation/metalperformanceshaders">Metal Performance
+                    Shaders</a>
+                for more difficult operations like matrix multiplication and convolution.
+            </p>
+            <p>As a consequence of leaning on MPS, Honeycrisp will typically underperform MLX on workloads
+                that are heavy in GPU matmuls, as MLX includes optimized kernels for this.
+                In contrast, when compared to PyTorch, Honeycrisp can sometimes be faster, especially when using a
+                <code>Backend</code> that supports offloading some computation to the Apple Neural Engine.
+            </p>
+            <p>However, one thing to keep in mind is that Honeycrisp allows joint execution on the ANE and the GPU.
+                I've been benchmarking it on a Mac Studio with a good GPU, but many devices have slower GPUs.
+                On these devices, the ANE is still just as fast, so it's quite possible that Honeycrisp
+                is already the fastest option for some workloads on these devices.</p>
+            <p>During development, I focused primarily on model training, and for the most part neglected inference
+                performance.
+                If you want to sample from large language models or diffusion models, you will probably be better off
+                using a framework with support for quantization and other inference-time optimizations.
+                However, I do plan to implement some backends for Honeycrisp that convert the operations
+                to other frameworks like MLX or CoreML, and this could be a potential avenue for writing
+                models in Honeycrisp and then shipping them for faster inference.
+            </p>
+
+            <h2>Using some new tools</h2>
+            <p>In principle, I don't like using Apple products. I wanted to do all of my development on a Linux laptop,
+                while still being able to test and run code that only runs on macOS. I ended up using <a
+                    href="https://code.visualstudio.com/docs/remote/tunnels">Tunnels in Visual Studio Code</a>,
+                which allows me to use VSCode on my laptop as a front-end for a server running on my Mac Studio. All
+                VSCode extensions run directly on the Mac, allowing them to compile code, provide error
+                highlighting, etc., while still working seamlessly on my laptop. Of course, this developer
+                experience has some flaws, the biggest of which is that everything is terrible on high-latency
+                networks (e.g. on an airplane).</p>
+            <p>Another essential piece of this puzzle was setting up VNC (for remote desktop access) and WireGuard.
+                It was super useful to be able to VNC directly to <code>10.9.0.4</code> from anywhere on any of my
+                devices, and know that I will be met with the Mac desktop. Without the ability to VNC into the Mac,
+                there are certain things which were completely broken. Want to run some code in <code>lldb</code>
+                over SSH? Well, it will just hang. But if you actually look at the GUI of the Mac, you will notice
+                that a popup has appeared asking the user for permissions to run developer tools. Similar things
+                happen for accessing files on the Desktop, or on external drives.</p>
+
+            <h2>Conclusion</h2>
+            <p>
+                I want to emphasize that I am one person, and everything I just talked about is part
+                of a solo hobby project.
+                By no means am I claiming to have created the best&mdash;or even a good&mdash;deep
+                learning framework.
+                This project was all about learning, both about Apple development and about deep
+                learning frameworks in general.
+            </p>
+            <p>
+                With that being said, I am truly proud of what I've built so far, and I don't intend
+                to stop and jump to some other framework any time soon.
+                I'm excited to see if anybody else wants to give this framework a try.
+                If you do, be sure to check out the
+                <a href="https://github.com/unixpickle/honeycrisp-examples">honeycrisp-examples</a>
+                repo, which might even spark some inspiration for a first project.
+            </p>
+
+        </div><!-- .entry-content -->
+        <div class="entry-footnotes">
+            <p><sup class="footnote-pointer"><a href="#footnote-src-1" id="footnote-content-1">1</a></sup> MLX does not
+                currently allow users
+                to
+                define custom operations in languages other than C++, preventing Swift users from writing autograd
+                operations in native Swift or using custom shaders. Additionally, MLX does not build correctly with
+                SwiftPM, and requires Xcode.</p>
+            <p><sup class="footnote-pointer"><a href="#footnote-src-2" id="footnote-content-2">2</a></sup> While MLX
+                does use property wrappers to mark submodules in a module,
+                it does not do so for parameters.
+                Instead, when modifying a parameter of a module, you
+                <a
+                    href="https://github.com/ml-explore/mlx-swift/blob/156a96ca3b513d4add03f8dcd72668554615cc85/Source/MLXNN/Module.swift#L90">must</a>
+                wrap your changes in a special <code>update()</code> call to update the cache that
+                is computed with reflection.
+            </p>
+        </div>
+    </article>
+    <script src="hljs/highlight.min.js"></script>
+    <script src="hljs/swift.min.js"></script>
+    <script>
+        let elements = document.getElementsByClassName("swift-code");
+        for (let i = 0; i < elements.length; i++) {
+            hljs.highlightElement(elements[i], { language: "swift" });
+        }
+    </script>
+</body>
+
+</html>
