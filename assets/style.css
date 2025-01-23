@@ -40,6 +40,9 @@ nav.navbar {
     background-color: white;
     text-align: center;
     box-shadow: 0 0 10px 0 rgb(0, 0, 0, 0.3);
+
+    /* go over <audio> elements */
+    z-index: 1;
 }
 
 nav.navbar a {
