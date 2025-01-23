@@ -98,6 +98,7 @@ ul.article-list li a:hover .article-date {
 /* Headings */
 h1,
 h2 {
+    scroll-margin-top: 60px;
     font-weight: bold;
     color: #222;
     margin-bottom: 0.5em;

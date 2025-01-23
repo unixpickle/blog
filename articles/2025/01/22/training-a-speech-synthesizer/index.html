@@ -1,0 +1,204 @@
+<html>
+
+<head>
+    <style>
+        .audio-container>label {
+            display: block;
+            text-align: center;
+            font-style: italic;
+        }
+
+        .audio-container>audio {
+            display: block;
+            margin: 0 auto 10px auto;
+        }
+    </style>
+</head>
+
+<body>
+    <article class="post-581 post type-post status-publish format-standard hentry category-uncategorized">
+        <header class="entry-header">
+            <h1 class="entry-title">Training a Speech Synthesizer</h1>
+        </header>
+        <div class="entry-content">
+            <p>Computers are much cooler when they talk to you, which is why people have been working on <a
+                    href="https://en.wikipedia.org/wiki/Speech_synthesis">speech synthesis</a> for decades (arguably
+                centuries).
+                I decided to dip my toe into this domain by using modern deep learning tools to clone an existing speech
+                synthesizer: Siri.</p>
+            <p>Creating a speech synthesizer with today's tools is actually pretty straightforward.
+                We want to generate an audio waveform, which means we probably want to train a generative model.
+                There are a plethora of generative models we could reach for, such as <a
+                    href="https://en.wikipedia.org/wiki/Diffusion_model">diffusion models</a> or autoregressive <a
+                    href="https://en.wikipedia.org/wiki/Transformer_(deep_learning_architecture)">Transformers</a>.</p>
+            <p>For this project, I opted to use <a href="https://arxiv.org/abs/1711.00937">VQ-VAE</a>, a two-stage
+                approach where we first learn to compress the data and then model the compressed representation.
+                Following this approach, I first created a low-bitrate representation of
+                audio, and then I trained an autoregressive Transformer on top of these latent codes.</p>
+            <p>The samples from the model are sometimes quite impressive, and other times surprisingly broken. If you
+                came here for samples, you can skip to the <a href="#samples">last section</a> of this post.</p>
+            <h2 class="wp-block-heading">Collecting the data</h2>
+            <p>To train a deep learning model, we typically need to collect a large amount of training data.
+                For once, this was the easy part. All I did was feed 100 ebooks from <a
+                    href="https://www.gutenberg.org/">Project Gutenberg</a> into the Mac's built-in <code>say</code>
+                command-line utility.</p>
+            <p>I ended up producing about 1.5M short audio files. After de-duplicating the actual texts, I was left with
+                about 1M of these. This was likely more than I needed, but it's
+                better to be safe than sorry when you have the option to produce unlimited data.</p>
+            <h2 class="wp-block-heading">Training discrete codes</h2>
+            <p>Raw audio data is <i>big</i>. At a bitrate of 24kHz, a five second audio file contains
+                <code>24000*5=120000</code>
+                samples. If you've worked with present-day language models, this probably seems a lot longer than you'd
+                want, especially when training on a single machine.
+            </p>
+            <p>Luckily, audio data is very compressible. The VQ-VAE paradigm takes advantage of this by first learning
+                to compress the data into sequences of discrete codes before modeling these sequences with a more
+                powerful model.
+                In my case, I compressed the audio down to 96 Hz discrete codes, meaning that each five second audio
+                clip
+                becomes 480 tokens&mdash;much more manageable for a powerful sequence model.
+            </p>
+            <p>Sadly, 480 codes probably aren't enough to encode every detail of an audio waveform. When we decode
+                these discrete codes into raw audio samples, we would like our model to be able to "fill in the blanks",
+                so to speak, by doing some generation of its own.</p>
+            <p>To this end, I decided to try normalizing flows. In general, flows aren't very popular anymore, and they
+                do have various pitfalls. However, unlike diffusion models, they can produce a sample with a single
+                forward pass. This seemed like a nice property to have when you want to decode audio quickly.</p>
+            <p>
+                Training the VQ codes was, surprisingly, the toughest part of this project. Initially, I had some
+                trouble making training stable. At one point, I even discovered a bug in a previous version of Apple's
+                <a href="https://developer.apple.com/documentation/metalperformanceshaders">Metal Performance
+                    Shaders</a> which caused incorrect gradients.
+                Even after tuning hyperparameters, dealing with divergences, and scaling up the model
+                considerably, one might argue that the codes are still pretty bad.
+            </p>
+            <p>To see how well the codes work, we can compress a waveform into discrete codes, and then decode it back.
+                We can see from this example that we are losing a lot of detail and quality:</p>
+            <div class="audio-container">
+                <label>Input waveform</label>
+                <audio controls>
+                    <source src="audio/this%20is%20a%20test_input.wav" type="audio/wav">
+                </audio>
+            </div>
+            <div class="audio-container">
+                <label>Reconstructed waveform</label>
+                <audio controls>
+                    <source src="audio/this%20is%20a%20test_output.wav" type="audio/wav">
+                </audio>
+            </div>
+            <p>I probably could have trained better codes, especially if I had abandoned normalizing flows. However, I
+                had already invested about two weeks of GPU time into training the VQ codes for this project, and I
+                wanted to move on to the fun part.</p>
+            <h2 class="wp-block-heading">Training a transformer</h2>
+            <p>Once we can encode audio into low-bitrate sequences of discrete codes, we are in a great position to
+                train a
+                Transformer. I opted to reuse my existing Transformer implementation with <a
+                    href="https://arxiv.org/abs/2104.09864">Rotary Embeddings</a>, and didn't need to make any real
+                modifications to make it work for this project.</p>
+            <p>I only trained the Transformer for a few days, during which time I dropped the learning rate twice (as
+                you can see from the learning curve). I found that training was ridiculously stable.</p>
+            <figure class="wp-block-image size-full">
+                <img alt="A learning curve for training a transformer model on audio. The y-axis is loss, and the x-axis is training steps."
+                    src="img/plot.png" />
+                <figcaption class="blocks-gallery-caption wp-element-caption">
+                    The learning curve of the Transformer text-to-speech model. The y-axis is negative log-likelihood of
+                    the discrete sequences, and the x-axis is training steps.
+                </figcaption>
+            </figure>
+            <p>Early in training, the samples from the model sounded pretty hilarious. For example, here is the model
+                attempting to say "the quick brown fox jumps over the lazy dog":</p>
+            <div class="audio-container">
+                <label>An early model sample</label>
+                <audio controls>
+                    <source src="audio/the%20quick%20brown%20fox%20early.wav" type="audio/wav">
+                </audio>
+            </div>
+            <p>Even after training the model for a few days, I was surprised that it liked putting weird
+                sounds at the end of the sample. For example,</p>
+            <div class="audio-container">
+                <label>"This is a test" is spoken with a strange artifact at the end.</label>
+                <audio controls>
+                    <source src="audio/this%20is%20a%20test_artifact.wav" type="audio/wav">
+                </audio>
+            </div>
+            <p>To make a long story short, it turned out that every training example's caption ended with
+                "\n\r". This was an artifact of my data preprocessing.
+                When I was sampling from the model, I did not put these control sequences at the end of
+                the prompt, and this caused the model to do weird things (like creating extra sounds after the prompt).
+                To my relief, when I added "\n\r" to every prompt I fed to the model, the artifacts were gone.</p>
+            <h2 id="samples" class="wp-block-heading">Successes and failure cases</h2>
+            <p>The best way to get to know a model is to try it on a bunch of prompts. In this section, I'll walk
+                through a few observations I've made about the model. If you want to try it yourself, you can follow the
+                instructions <a href="https://github.com/unixpickle/SynthClone">on Github</a>.
+            </p>
+            <p>Surprisingly, the model can sometimes pronounce unusual (out of distribution) words, such as "DALL-E". Of
+                course, when this fails, you could also use a phonetic spelling that might be easier for the model.
+            </p>
+            <div class="audio-container">
+                <label>"DALL-E generates images"</label>
+                <audio controls>
+                    <source src="audio/examples/DALL-E%20generates%20images.wav" type="audio/wav">
+                </audio>
+            </div>
+            <div class="audio-container">
+                <label>"Dolly generates images"</label>
+                <audio controls>
+                    <source src="audio/examples/Dolly%20generates%20images.wav" type="audio/wav">
+                </audio>
+            </div>
+            <p>Interestingly, the model has no problem with English tongue twisters.
+                However, I did notice that the second example occurs in the training corpus (although it is
+                split in the middle across two different training examples).</p>
+            <div class="audio-container">
+                <label>"She sells seashells by the seashore."</label>
+                <audio controls>
+                    <source src="audio/examples/She%20sells%20seashells%20by%20the%20seashore.wav" type="audio/wav">
+                </audio>
+            </div>
+            <div class="audio-container">
+                <label>"Peter Piper picked a peck of pickled peppers."</label>
+                <audio controls>
+                    <source src="audio/examples/Peter%20Piper%20picked%20a%20peck%20of%20pickled%20peppers..wav"
+                        type="audio/wav">
+                </audio>
+            </div>
+            <p>There are a lot of numbers in the training data, but the model still hasn't quite mastered how to say
+                large numbers. For example, it might start at the wrong order of magnitude, and then have to make up
+                digits:</p>
+            <div class="audio-container">
+                <label>"783"</label>
+                <audio controls>
+                    <source src="audio/examples/783.wav" type="audio/wav">
+                </audio>
+            </div>
+            <div class="audio-container">
+                <label>"1234"</label>
+                <audio controls>
+                    <source src="audio/examples/1234.wav" type="audio/wav">
+                </audio>
+            </div>
+            <div class="audio-container">
+                <label>"1049"</label>
+                <audio controls>
+                    <source src="audio/examples/1049.wav" type="audio/wav">
+                </audio>
+            </div>
+            <p>While the model is okay with traditional tongue twisters, it does have many of its own. For example,
+                these are seemingly easy prompts where the model simply cannot say what you'd expect.</p>
+            <div class="audio-container">
+                <label>"A B C D E F G"</label>
+                <audio controls>
+                    <source src="audio/examples/A%20B%20C%20D%20E%20F%20G.wav" type="audio/wav">
+                </audio>
+            </div>
+            <div class="audio-container">
+                <label>"aaaaaaaaaa"</label>
+                <audio controls>
+                    <source src="audio/examples/aaaaaaaaaa.wav" type="audio/wav">
+                </audio>
+            </div>
+        </div>
+    </article>
+</body>
+
+</html>
