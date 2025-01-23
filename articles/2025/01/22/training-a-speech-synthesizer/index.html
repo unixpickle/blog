@@ -21,11 +21,11 @@
             <h1 class="entry-title">Training a Speech Synthesizer</h1>
         </header>
         <div class="entry-content">
-            <p>Computers are much cooler when they talk to you, which is why people have been working on <a
+            <p>Computers are much cooler when they talk to you, which is probably why people have been working on <a
                     href="https://en.wikipedia.org/wiki/Speech_synthesis">speech synthesis</a> for decades (arguably
                 centuries).
-                I decided to dip my toe into this domain by using modern deep learning tools to clone an existing speech
-                synthesizer: Siri.</p>
+                I decided to dip my toe into this domain by using modern deep learning tools to train my own speech
+                synthesizer.</p>
             <p>Creating a speech synthesizer with today's tools is actually pretty straightforward.
                 We want to generate an audio waveform, which means we probably want to train a generative model.
                 There are a plethora of generative models we could reach for, such as <a
@@ -35,8 +35,15 @@
                 approach where we first learn to compress the data and then model the compressed representation.
                 Following this approach, I first created a low-bitrate representation of
                 audio, and then I trained an autoregressive Transformer on top of these latent codes.</p>
-            <p>The samples from the model are sometimes quite impressive, and other times surprisingly broken. If you
-                came here for samples, you can skip to the <a href="#samples">last section</a> of this post.</p>
+            <p>I could have sourced training data from many places, but I chose to take a particularly easy route: I
+                created synthetic data using Apple's speech synthesizer. In particular, I trained my model on a dataset
+                of about 1M examples of Siri saying short strings of text.</p>
+            <p>The
+                samples from the model are sometimes quite impressive, and other times surprisingly broken. If you
+                came here for samples, you can skip to the <a href="#samples">last section</a> of this post.
+                All training ran on a single Mac Studio over the course of a few weeks, and
+                the <a href="https://github.com/unixpickle/SynthClone">code</a> is written in Swift and uses <a
+                    href="https://github.com/unixpickle/honeycrisp">Honeycrisp</a> as a deep learning framework.</p>
             <h2 class="wp-block-heading">Collecting the data</h2>
             <p>To train a deep learning model, we typically need to collect a large amount of training data.
                 For once, this was the easy part. All I did was feed 100 ebooks from <a
