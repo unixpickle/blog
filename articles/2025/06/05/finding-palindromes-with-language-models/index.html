@@ -1,0 +1,200 @@
+<html>
+
+<head>
+</head>
+
+<body>
+    <article class="post-581 post type-post status-publish format-standard hentry category-uncategorized">
+        <header class="entry-header">
+            <h1 class="entry-title">Finding Palindromes with Language Models</h1>
+        </header>
+        <div class="entry-content">
+            <p>As a side project, I've been searching for novel palindromes using language models. By palindromes, I
+                mean phrases like “Ottoman in a motto” which read like real sentences but happen to be spelled the same
+                forwards and backwards (ignore capitalization, punctuation, and spaces).</p>
+
+            <p>To achieve my goal, I trained a specialized language model that I call the <i>palindromic LM</i>. Among
+                other things, this model generates letters from both ends. I found that palindromes under this model are
+                distributed over a light-tailed distribution, allowing me to almost exactly sample palindromes from the
+                model.</p>
+
+            <figure class="wp-block-image size-full">
+                <img alt="A GIF showing the text 'senilepipelines' being faded in letter-by-letter from the outside letters inward."
+                    src="img/generation_order.gif" />
+                <figcaption class="blocks-gallery-caption wp-element-caption">
+                    The palindromic LM generates text autoregressively going inward from both ends.
+                </figcaption>
+            </figure>
+
+            <p>During my journey, I've already found a few multi-word palindromes. For fun, I'll list some here</p>
+            <ul>
+                <li>Senile pipelines</li>
+                <li>DNA band</li>
+                <li>Deep speed</li>
+                <li>Won snow</li>
+                <li>Gods dog</li>
+                <li>Never even</li>
+                <li>Party trap</li>
+                <li>Some demos</li>
+                <li>Seminar of PFP for Animes</li>
+                <li>Ottoman in a motto</li>
+                <li>Dessert stressed</li>
+                <li>Was late metal saw</li>
+            </ul>
+
+            <h2>Why not use an existing LLM?</h2>
+
+            <p>In theory, we don't need a new language model to discover palindromes. A language model allows us to
+                sample from a distribution \(P(s)\) for text sequences s. We'd like to somehow use this model to
+                sample
+                from \( P(s|s\text{ is a palindrome}) \).</p>
+
+            <p>One way to do this is with rejection sampling, where we repeatedly sample sequences from \(P(s)\) until
+                one
+                of them happens to be a palindrome. While this is theoretically correct, it's prohibitively expensive
+                even for moderately long sequences. In my experiments, I found that I needed to sample about 100k
+                sequences to find a single palindrome of 9 letters.</p>
+
+            <p>It would be nice if we could sample palindromes more efficiently. Sadly, this is difficult with most LLMs
+                for a few reasons. First, the vast majority of available models generate sequences in one direction,
+                from left-to-right. Second, these models usually operate on “tokens” (think: words) rather than letters.
+                This means that even if we could constrain the generated sequence itself to be a palindrome, it wouldn't
+                mean that the individual <i>letters</i> are the same forward and backwards. Tokenization also makes it
+                more difficult to ignore spaces and capitalization.</p>
+
+            <p>There is one class of language model that might be somewhat conducive to palindrome generation:
+                byte-level diffusion models. I'd be really interested to see if anybody can make this work, but I
+                haven't had a chance to try it myself.</p>
+
+            <h2>Using a special-purpose LM</h2>
+
+            <p>I trained what I'm calling a “palindromic LM”: a language model specifically designed to help us search
+                for palindromes. This model is trained on sequences of individual lowercase letters, with all
+                punctuation and whitespace removed. Instead of generating sequences left-to-right, the model first
+                generates the length of the sequence, and then generates letters from both ends.</p>
+
+            <p>This model can still be viewed as a standard left-to-right autoregressive model, just with odd-looking
+                sequences. For example, the text “Hello world” would end up being encoded as “hdellrloow”.</p>
+
+            <p>To produce training sequences, I took about 2GB of text from Wikipedia and split it into short sequences
+                at word boundaries. I didn't do anything clever about sentence boundaries, which means there's still
+                likely a lot of room for improvement.</p>
+
+            <p>Since the model generates text from both ends, we can force it to generate valid palindromes by
+                constraining pairs of consecutively generated letters to be equal. While this alone isn't enough to
+                sample from the correct palindrome distribution, it allows us to perform breadth-first search over
+                palindrome sequences.</p>
+
+            <h2>Searching for palindromes</h2>
+
+            <p>Once we have a palindromic LM, we can use breadth-first search to enumerate all valid palindromes in
+                order
+                of their likelihood under the model. The basic algorithm looks like this, in pseudocode:</p>
+
+            <pre>queue = [empty_sequence]
+while queue not empty:
+  next = queue.pop()
+  if next is the desired length:
+    yield next
+  else:
+    for letter in alphabet:
+      # Only add pairs of a letter with itself to
+      # constrain to palindromes.
+      queue.add(next + [letter, letter])
+    sort queue by P(s)</pre>
+
+            <p>First, let's use this algorithm to find the highest-likelihood palindrome for each sequence length.
+                However, we will find something pretty sad: the most likely palindrome is quite boring for longer
+                sequences:</p>
+
+            <ul>
+                <li>Length 5: level</li>
+                <li>Length 6: hannah</li>
+                <li>Length 7: racecar</li>
+                <li>Length 8: trappart</li>
+                <li>Length 9: nevereven</li>
+                <li>Length 10: levellevel</li>
+                <li>Length 11: levelslevel</li>
+                <li>Length 12: xxxxxxxxxxxx</li>
+                <li>Length 13: xxxxxxxxxxxxx</li>
+                <li>Length 14: xxxxxxxxxxxxxx</li>
+                <li>Length 15: xxxxxxxxxxxxxxx</li>
+                <li>Length 16: xxxxxxxxxxxxxxxx</li>
+            </ul>
+
+            <p>Why are longer palindromes so boring? The answer involves a counterintuitive
+                <a href="https://arxiv.org/abs/1810.09136">observation</a> about generative
+                models over high-dimensional spaces,
+                <a href="https://arxiv.org/abs/1904.09751">especially text generators</a>:
+                data points with unusually high likelihood tend to look atypical. Why don't we notice this when we
+                sample from these models? To make a complex topic simple: the space of high-density, atypical sequences
+                is many orders-of-magnitude smaller than the space of typical sequences, so we never see the atypical
+                ones unless we go looking for them.
+            </p>
+
+            <h2>The palindrome probability space</h2>
+
+            <p>We can use breadth-first search to enumerate palindromes sorted from highest to lowest likelihood. If we
+                enumerated <i>all</i> palindromes in this way, it would be no cheaper than brute-force search. However,
+                it might be enough to enumerate a small fraction of this space. In particular, if the palindrome
+                distribution is light-tailed, then BFS will cover the majority of the probability mass fairly quickly.
+            </p>
+
+            <p>To understand this point, imagine that we want to randomly sample a car model out of all the cars in the
+                world. If it turns out that 99% of cars are one of only 20 models, then we can <i>probably</i> get a
+                valid sample by simply sampling in this subspace of 20 models. We could even sample “unknown” 1% of the
+                time to indicate that there is some missing probability mass from our sampler.</p>
+
+            <p>I have fairly strong empirical evidence that we are in this happy, light-tailed universe. I'll lay out my
+                findings, and demonstrate that these results are almost surely true for palindromes of length 9.</p>
+
+            <p>First, I dumped the 48,965 highest-likelihood length 9 palindromes using BFS. With my small
+                palindromic LM, this search took less than an hour. Next, I plotted the sorted likelihoods, and found
+                that
+                the tail of this distribution cleanly follows a second-order power law. If we assume this power law
+                holds
+                beyond the data I sampled, we can integrate it to estimate the tail likelihood of all the remaining
+                sequences (about \(26^5\), or 12 million).</p>
+
+            <figure class="wp-block-image size-full">
+                <img alt="A plot showing a power law fit and an empirical distribution of palindromes."
+                    src="img/dist.png" />
+                <figcaption class="blocks-gallery-caption wp-element-caption">
+                    The tail of the probability distribution of palindromes can be well-approximated by a second-order
+                    power law.
+                </figcaption>
+            </figure>
+
+            <p>Using this technique, I can estimate that I've already covered 98.78% of the palindrome probability space
+                with my small subset of samples. In other words, if we were to exactly sample from
+                \( P(s|s\text{ is a palindrome}) \), we would find that our sample is contained in my list of 48,965
+                palindromes about 98.78% of the time. This is pretty cool: I only enumerated 0.4% of strings that happen
+                to be palindromes, but these cover almost 99% of the space of samples.</p>
+
+            <p>What if my power law doesn't extrapolate, and the distribution isn't light-tailed like I thought? To test
+                this empirically, I used rejection sampling to produce 30 samples from the exact palindrome
+                distribution. This took a few hours, and each palindrome required rejecting about 100k samples. I found
+                that all 30 of these samples were contained in the results of my BFS. Given this, it's fair to say that
+                there's nothing drastically wrong with my theory, at least for length 9 palindromes under this
+                particular model.</p>
+
+            <h2>Limitations</h2>
+
+            <p>My method heavily depends on having a good palindromic LM. In practice, the language models that I can
+                train on a single Mac mini are pretty tiny (and therefore bad). One side-effect of this is that
+                well-known palindromes, like “UFO Tofu”, actually have really low likelihood under my model. Another
+                side-effect is that we often get invalid or weird samples from the model. For example, random length 9
+                palindromes are often nonsense: threverht, decoloced, dedicided, streserts, streberts, separapes,
+                noisesion.</p>
+
+            <p>In retrospect, I actually wish I had designed the palindromic LM to generate samples inside-out instead
+                of outside-in. This would allow the model to gradually elongate palindromes, rather than conditioning
+                samples on the length from the start. More importantly, I feel that this strategy for generating
+                palindromes is closer to how humans find palindromes: we start with a short palindrome, and try to
+                figure out how to elongate it by adding extra words to either end.</p>
+
+        </div>
+    </article>
+</body>
+
+</html>
