@@ -1,0 +1,334 @@
+<html>
+
+<head>
+</head>
+
+<body>
+    <style>
+        iframe {
+            width: 100%;
+            height: 400px;
+            border: none;
+            border-radius: 12px;
+            box-sizing: border-box;
+        }
+
+        details {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 0.5em 1em;
+            margin: 1em 0;
+            background: #f9f9f9;
+        }
+
+        details[open] {
+            background: #f1f8ff;
+            border-color: #007acc;
+        }
+
+        summary {
+            font-weight: bold;
+            cursor: pointer;
+            list-style: none;
+            /* remove default arrow */
+        }
+
+        summary::before {
+            content: "▶ ";
+            margin-right: 3px;
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+
+        details[open] summary::before {
+            transform: rotate(90deg);
+        }
+
+        details pre {
+            font-family: monospace;
+            background-color: #222;
+            padding: 1em;
+            border-radius: 12px;
+            overflow-x: auto;
+            color: #aea;
+        }
+
+        .peco-page {
+            border-radius: 5px;
+            box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+    <article class="post-581 post type-post status-publish format-standard hentry category-uncategorized">
+        <header class="entry-header">
+            <h1 class="entry-title">An AI agent for unsubscribing from spam</h1>
+        </header>
+        <div class="entry-content">
+            <p>Many people receive a ton of unwanted spam email from legitimate companies. While each email includes an
+                "unsubscribe" link, most people don't have time to unsubscribe from every mailing list one-by-one.</p>
+
+            <p>Sadly, it's nontrivial to automate the unsubscribing process, even though email clients try to make it
+                easier.<sup class="footnote-pointer"><a href="#footnote-content-1" id="footnote-src-1">1</a></sup> Every
+                email is formatted differently, so it's not obvious how to find unsubscribe links automatically. On
+                top of this, every unsubscribe page is its own fresh hell to navigate.</p>
+
+            <p>To address this problem, I built an AI agent<sup class="footnote-pointer"><a href="#footnote-content-2"
+                        id="footnote-src-2">2</a></sup> to unsubscribe from spam. The agent works in two steps: first,
+                it goes through your email inbox and finds unsubscribe links; next, it drives a web browser to
+                interact with the corresponding unsubscribe pages. While the agent isn't perfect, it did significantly
+                reduce the amount of spam I receive. It's also pretty cool to watch in action!</p>
+
+            <h2>Finding Unsubscribe Links</h2>
+
+            <p>The first step of unsubscribing from spam is finding the unsubscribe links in emails. For this part of
+                the agent, I
+                used the Gmail API to list emails in the user's inbox. For each email, we get a subject, a body
+                "snippet", and a raw HTML (or plaintext) dump of the email.</p>
+
+            <p>To find the unsubscribe link, my program first makes an API call where the HTML links in the email are
+                presented in a numbered list:</p>
+
+            <pre>1. Great deals https://sometime.com/deals?q=aoenutsohaut
+2. Unsubscribe https://somesite.com/unsubscribe
+...</pre>
+
+            <p>We prompt the model to produce the index that looks the most like an unsubscribe link, or -1 if none is
+                found. The exact developer prompt is:</p>
+
+            <details>
+                <summary>Developer Prompt 💻📝</summary>
+                <pre>Out of these links, choose the one that looks like an unsubscribe link.
+End your response with "Answer: N" where N is a link number, or -1 if
+none of the links look like an unsubscribe link. If more than one looks
+like an unsubscribe link, simply pick one of them arbitrarily.</pre>
+            </details>
+
+            <p>This makes the model's job easy: it just has to pick a link out of a list. The call is also relative
+                cheap, since
+                it doesn't include the entire text of the email.</p>
+
+            <p>However, this technique is not very reliable. For example, some spam emails are formatted like <i>"If you
+                    want to unsubscribe from future emails, <u>click here</u>. If you want MORE spam, <u>click
+                        here</u>"</i>. So
+                there's multiple links, all with identical text.</p>
+
+            <p>In the above example, the HTML &lt;a&gt; tags themselves doesn't contain enough information
+                to identify the unsubscribe link, and the above API call usually (correctly) returns -1.</p>
+
+            <p>To handle unusual unsubscribe link situations, I fall back on a brute-force approach: feeding the entire
+                HTML source code to a model. In practice, I didn't want to exhaust context limits, so I feed the email
+                source code chunk-by-chunk. I slightly modify the source code to add an extra data-index attribute to
+                each &lt;a&gt; tag, so that the model still just has to pick a link index (rather than regurgitating a
+                huge, messy URL). The developer prompt here is:</p>
+
+            <details>
+                <summary>Developer Prompt 💻📝</summary>
+                <pre>Each link on this page has a data-index attribute with an integer value.
+Find the link that looks like an Unsubscribe link (this is an email's source code), and
+end your response with a line like Answer: N where N is the index.
+There may be no unsubscribe link, and the code may be truncated in such a way that the link
+is missing or hard to determine. In that case, output Answer: -1.
+You may think out loud before giving your answer, but give the answer on a new line in the above format.</pre>
+            </details>
+
+            <p>I call the API for every chunk and take the first chunk which has an answer other than -1. This works
+                surprisingly well. To speed things up a bit by skipping many chunks containing dumb stuff like CSS,
+                I
+                sort the chunks such that any chunk containing the word "unsubscribe" is first.</p>
+
+            <h2>What's at an unsubscribe link?</h2>
+
+            <p>Finding the unsubscribe link is the easy part. Once you follow the link, you may be met with any
+                number of strange websites that ask you to do extra work to actually unsubscribe. For example, consider
+                this page from PECO:</p>
+
+            <figure class="wp-block-image size-full">
+                <img alt="A webpage describing that the user is only unsubscribed to marketing emails."
+                    src="img/peco1.png" style="max-width: 80%" class="peco-page" />
+                <figcaption class="blocks-gallery-caption wp-element-caption">
+                    The entrypoint of the PECO unsubscribe flow.
+                </figcaption>
+            </figure>
+
+            <p>On this page, it does say we've been unsubscribed from "PECO Marketing Promotions emails". However, I
+                am still subscribed to other kinds of spam, and we need to click the big blue button to fix this.
+                Once we click this button, we see yet another page</p>
+
+            <figure class="wp-block-image size-full">
+                <img alt="A webpage with options of email lists to unsubscribe from." src="img/peco2.png"
+                    style="max-height: 500px;" class="peco-page" />
+                <figcaption class="blocks-gallery-caption wp-element-caption">
+                    The second page of the PECO unsubscribe flow.
+                </figcaption>
+            </figure>
+
+            <p>On this page, we either have to uncheck all of the boxes, or check the small "Unsubscribe from all.."
+                box at the bottom, and then hit "Accept >>".</p>
+
+            <p>Every company has a different flow for something like this, and the actual structure of the webpage
+                varies greatly as well. Clearly, humans can navigate these things (mostly) fine, but it would be
+                difficult to hardcode rules that can handle every company's unsubscribe flow robustly. By the way, this
+                is what they are counting on!</p>
+
+            <h2>Navigating Unsubscribe Pages</h2>
+
+            <p>To automate the unsubscribing process, I use AI to directly control a web browser. This way, the AI can
+                see what a webpage is requiring it to do, and it has a lot of flexibility without any human
+                intervention.</p>
+
+            <p>The AI interacts with the browser in a loop. First, the program navigates to the unsubscribe page and
+                sends a screenshot to the agent. The agent can "think out loud" as much as
+                it wants, but then it outputs a block of JavaScript code. This code is then run on the webpage. If the
+                appearance of the page changes at all, a new screenshot is sent to the agent. Additionally, the output
+                of the previous JavaScript code is sent to the agent. The loop runs like this until the agent chooses to
+                call a success() or failure() function to indicate that the task is done or cannot be completed.</p>
+
+            <p>I do various things to make the agent's job easier. For example, I provide it with a
+                <code>scrollDown()</code> and <code>clickText()</code> function.
+                I also augment the first message with information about HTML tags on the page, as well as a
+                model-generated summary of the HTML content of the page. The latter requires an extra (chunked) API
+                call, and in my tests it actually didn't seem to help <i>that</i> much.
+            </p>
+
+            <p>The developer prompt for the unsubscribing agent is as follows:</p>
+
+            <details>
+                <summary>Developer Prompt 💻📝</summary>
+                <pre>Your goal is to figure out how to run JavaScript on the page to make sure the user is
+unsubscribed from this source of spam and any other sources that this vendor might send
+* After every message you send, I will give you a new screenshot of the page (if it has changed), and any
+output from print() calls.
+* You may think out loud in your response, but end the response with a code block to execute on the
+page.
+* If the page already says that the user has been unsubscribed from ALL emails, then output the code
+success().
+* If the page does not seem to have anything to do with unsubscribing, or you do not know what to do,
+then output the code failure().
+* Do not output success() prematurely; make sure you see the latest page first.
+* DO NOT attempt to submit forms (e.g. by pressing buttons) until you have VISUALLY CONFIRMED that you
+have checked the correct boxes or typed the correct text.
+* To get more information from the page, you can use the provided print() function, which will call
+toString() on its argument. I will send the outputs of all prints in the next message to allow
+iteration.
+* The output of print() will be truncated, so the page might have too much code to print directly in one
+call.
+* I have provided an extra clickText() function which finds elements that contain the given text and
+clicks them all. It returns true if a click was performed, false otherwise.
+* I have provided an extra scrollDown() function which scrolls down the page further (if it's a long
+page) so that you can see more content.
+* The user's email address is: {user_email}</pre>
+            </details>
+
+            <p>One neat thing is that we can cleanly visualize what the agent is doing by looking at a chat transcript.
+                It's amazing to watch the agent interact with webpages like this.</p>
+
+            <details>
+                <summary>Chat transcript 🧵</summary>
+                <iframe src="example/honeywell_example_cool.html"></iframe>
+            </details>
+
+            <p>Sometimes, it seems very smart. Other times, it seems wildly stupid. Given this, how can we measure how
+                successful it actually is?</p>
+
+            <h2>Testing with simulations</h2>
+
+            <p>I created a suite of "simulations" that test the unsubscribe agent on various realistic webpages. At
+                first, I used GPT-5 to code a few unsubscribe websites from scratch. Then, after trying the agent on
+                some of my actual spam emails, I added some more realistic (and difficult) simulations based on these
+                companies' websites.</p>
+
+            <p>To test my agent, I run four trials on each of the simulations. I then report success rate, as well alse
+                true/false positives/negatives:</p>
+
+            <pre>simple_1: success_rate=4/4 (tn=0 fp=0 fn=0)
+click_to_unsub: success_rate=4/4 (tn=0 fp=0 fn=0)
+enter_email: success_rate=4/4 (tn=0 fp=0 fn=0)
+bryant_park: success_rate=3/4 (tn=0 fp=1 fn=0)
+goldbelly: success_rate=4/4 (tn=0 fp=0 fn=0)
+honeywell: success_rate=2/4 (tn=0 fp=2 fn=0)
+peco: success_rate=2/4 (tn=0 fp=2 fn=0)
+fandango: success_rate=4/4 (tn=0 fp=0 fn=0)</pre>
+
+            <p>The first three of these are my own simple tests. The rest are based on real spam emails I recieved.</p>
+
+            <p>One nice thing about these tests is that we can easily measure the effect of our prompting strategy. For
+                example, if I remove any mention of the <code>clickText()</code> helper from the prompt, success rate
+                drops for a few of the simulations:</p>
+
+            <pre>simple_1: success_rate=4/4 (tn=0 fp=0 fn=0)
+click_to_unsub: success_rate=4/4 (tn=0 fp=0 fn=0)
+enter_email: success_rate=4/4 (tn=0 fp=0 fn=0)
+bryant_park: success_rate=4/4 (tn=0 fp=0 fn=0)
+goldbelly: success_rate=0/4 (tn=1 fp=3 fn=0)
+honeywell: success_rate=0/4 (tn=0 fp=4 fn=0)
+peco: success_rate=1/4 (tn=0 fp=3 fn=0)
+fandango: success_rate=4/4 (tn=0 fp=0 fn=0)</pre>
+
+            <h2>Testing on my actual email</h2>
+
+            <p>On my own email account, the model found unsubscribe links for 38 unique domains. Of those, 31 yielded a
+                "success" status from the agent, 6 yielded a "failure" status, and 1 ran more than 10 interaction steps
+                (which is a limit I hardcoded). Even though the success rate looks high, sometimes the agent ran
+                into false positives, where it claims to have succeeded but actually kept me subscribed to some spam.
+            </p>
+
+            <p>The PECO simulation provides one example of a false positive. This page is particular difficult for the
+                model because it includes labels next to checkboxes that don't reference the checkbox with a
+                <code>for</code> attribute. As a result, the user can't just click the text, they have to click the
+                checkbox itself. Thus the normal <code>clickText()</code> function I gave the model doesn't help at all.
+            </p>
+
+            <details>
+                <summary>Chat transcript 🧵</summary>
+                <iframe src="example/peco_failure.html"></iframe>
+            </details>
+
+            <p>In this example, the model explicitly checks a checkbox by setting its value, which prevents the webpage
+                from running its own <code>onclick</code> handler to uncheck all the other checkboxes.
+                The HTML summary given to the agent includes some information about the page's JavaScript handling of
+                this checkbox, but the agent seemingly ignores it some of the time.</p>
+
+            <p>Sometimes, the model does do better on this particular website (it has about a 50% success rate). Here's
+                a case where it calls <code>click()</code> on the checkbox and therefore actually triggers the
+                JavaScript.</p>
+
+            <details>
+                <summary>Chat transcript 🧵</summary>
+                <iframe src="example/peco_success.html"></iframe>
+            </details>
+
+            <h2>Conclusion</h2>
+
+            <p>My main takeaway from this project is that you can do really cool and creative things by stitching
+                together LLM API calls. However, it feels more like alchemy than engineering, and it's
+                pretty hard to get the resulting system to be completely robust.</p>
+
+            <p>There are various "computer-using agent" implementations out there now, many of which support more
+                advanced controls than just running JavaScript on webpages. In theory, it should be possible to test
+                these agents on my small suite of unsubscribe flows to see how they fare. This could be an interesting
+                thing for somebody to try.</p>
+
+            <p>One thing I didn't try for this project is the official function calling interface provided by the OpenAI
+                API. Perhaps it would be more in-distribution for the model to run JavaScript code via a tool call than
+                it is to run the code via a code block at the end of each message. This is another potential area for
+                improvement to try.</p>
+
+            <p>Finally, I'll point out that if something like this starts becoming popular, then unsubscribe webpages
+                will start embedding prompt injections. I can't wait to witness this dystopian future.</p>
+        </div>
+        <div class="entry-footnotes">
+            <p><sup class="footnote-pointer"><a href="#footnote-src-1" id="footnote-content-1">1</a></sup> Some email
+                clients already try to help users unsubscribe from spam, for
+                example by reading the <code>List-Unsubscribe</code> header. However, companies have tricks to prevent
+                this from truly unsubscribing, even if they include the header. For example, this header could
+                unsubscribe the user from a company's "Weekly Deals" mailing list but not other mailing lists from the
+                same company such as "Product Updates". By scoping emails into tiny buckets, companies can continue
+                sending spam to customers who have already tried to unsubscribe.</p>
+            <p><sup class="footnote-pointer"><a href="#footnote-src-2" id="footnote-content-2">2</a></sup> The word
+                "agent" might be a bit controversial. Here, I mean a program that uses a language model in a closed loop
+                while controlling one or more tools. This seems aligned with other related uses, such as "compute-using
+                agent".</p>
+        </div>
+    </article>
+</body>
+
+</html>
